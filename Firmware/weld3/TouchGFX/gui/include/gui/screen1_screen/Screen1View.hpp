@@ -20,7 +20,7 @@ public:
     void refreshProfileSelection();
     void refreshControllerData();
 protected:
-    touchgfx::GraphWrapAndClear<101> resultGraph;
+    touchgfx::GraphWrapAndClear<81> resultGraph;
     touchgfx::GraphElementLine resultLine;
     touchgfx::PainterRGB888 resultPainter;
     touchgfx::TextAreaWithOneWildcard fileText;
@@ -29,6 +29,7 @@ protected:
     touchgfx::Unicode::UnicodeChar pageBuffer[4];
     touchgfx::TextAreaWithOneWildcard gridValueText[3][6];
     touchgfx::Unicode::UnicodeChar gridValueBuffer[3][6][8];
+    unsigned int dynamicGraphDataCounter;
     int targetCurrentAt(unsigned int timeMs) const;
     unsigned int totalWaveTime() const;
     void rebuildGraphs();

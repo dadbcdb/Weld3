@@ -2,6 +2,7 @@
 Firmware/weld3/Debug/
 Firmware/weld3/Release/
 Firmware/weld3/.settings/
+**/TouchGFX/build/
 
 # .NET/WPF build output and local publish folders
 **/bin/

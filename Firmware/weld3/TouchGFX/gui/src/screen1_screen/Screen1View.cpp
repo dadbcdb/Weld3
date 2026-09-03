@@ -4,6 +4,9 @@
 
 Screen1View::Screen1View()
 {
+    // The generated base constructor preloads the Designer preview points.
+    dynamicGraphDataCounter = dynamicGraph1.getUsedCapacity();
+
     // Keep the result graph pixel-perfect with the graph edited in Designer.
     // Reading the generated graph here also keeps future margin/padding edits in sync.
     resultGraph.setPosition(dynamicGraph1.getX(), dynamicGraph1.getY(),
@@ -165,25 +168,28 @@ int Screen1View::targetCurrentAt(unsigned int timeMs) const
 void Screen1View::rebuildGraphs()
 {
     const unsigned int total = totalWaveTime();
-    const float sampleMs = total / 100.0f;
+    const float sampleMs = total / 80.0f;
 
+    // Keep enough precision for fractional milliseconds per sample. Grid
+    // intervals themselves remain owned by the TouchGFX Designer project.
+    dynamicGraph1.setScale(100);
+    resultGraph.setScale(100);
     dynamicGraph1.clear();
     resultGraph.clear();
 
     dynamicGraph1.setGraphRangeY(0, 32000);
     dynamicGraph1.setXAxisFactor(sampleMs);
+    dynamicGraph1.setXAxisOffsetScaled(-static_cast<int>(dynamicGraphDataCounter) *
+                                       dynamicGraph1.getXAxisFactorScaled());
     resultGraph.setGraphRangeY(0, 32000);
     resultGraph.setXAxisFactor(sampleMs);
 
-    dynamicGraph1MinorXAxisGrid.setInterval(25);
-    dynamicGraph1MajorXAxisGrid.setInterval(50);
     dynamicGraph1MinorYAxisGrid.setInterval(2000);
     dynamicGraph1MajorYAxisGrid.setInterval(4000);
-    dynamicGraph1MajorXAxisLabel.setInterval(50);
     dynamicGraph1MajorYAxisLabel.setInterval(4000);
     dynamicGraph1Line1Painter.setColor(touchgfx::Color::getColorFromRGB(0, 230, 70));
 
-    for (unsigned int i = 0; i <= 100; ++i)
+    for (unsigned int i = 0; i <= 80; ++i)
     {
         const int target = targetCurrentAt(static_cast<unsigned int>(i * sampleMs));
         const int ripple = target == 0 ? 0 : static_cast<int>((i % 7) * 90) - 270;
@@ -198,6 +204,7 @@ void Screen1View::rebuildGraphs()
             resultGraph.addDataPoint(measured);
         }
     }
+    dynamicGraphDataCounter += dynamicGraph1.getUsedCapacity();
 
     dynamicGraph1.invalidate();
     if (presenter->isWeldResultAvailable())

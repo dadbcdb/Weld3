@@ -34,7 +34,7 @@ protected:
     touchgfx::Box __background;
     LeftCtrl leftCtrl1;
     touchgfx::Box box1_1;
-    touchgfx::GraphWrapAndClear<101> dynamicGraph1;
+    touchgfx::GraphWrapAndClear<81> dynamicGraph1;
     touchgfx::GraphElementGridX dynamicGraph1MinorXAxisGrid;
     touchgfx::GraphElementGridY dynamicGraph1MinorYAxisGrid;
     touchgfx::GraphElementGridX dynamicGraph1MajorXAxisGrid;

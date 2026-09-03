@@ -1,8 +1,16 @@
 # Project Status
 
-Last updated: 2026-09-01
+Last updated: 2026-09-03
 
 ## Implemented
+
+- Screen1 용접 파형 그래프의 X축 그리드는 TouchGFX Designer 설정으로 관리한다.
+  `.touchgfx`에서 81개 점(80개 구간), 주요선/라벨 10 샘플, 보조선 5 샘플로
+  설정해 주요선 8칸과 중간 보조선을 표시한다. 별도의 수동 경계선과
+  런타임 그리드 덮어쓰기는 사용하지 않는다. `GraphWrapAndClear`의 누적 데이터 개수를
+  별도로 추적하고 X축 오프셋으로 상쇄하여 파형을 다시 그릴 때마다 시간축이
+  0 ms부터 시작한다. 샘플당 시간의 소수 정밀도를 보존하기 위한 그래프 Scale
+  설정만 런타임에 둔다.
 
 - WinApp `LCD 캡처` and firmware `CAPTURE SCREEN`: transfers a hashed RGB888
   snapshot of the live LCD framebuffer and saves it as PNG on the PC.
