@@ -1,0 +1,1022 @@
+{
+  "Application": {
+    "Screens": [
+      {
+        "Name": "Screen1",
+        "CanvasBufferSize": 7200,
+        "Components": [
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          },
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272,
+            "LockPosition": true
+          },
+          {
+            "Type": "DynamicGraph",
+            "Name": "dynamicGraph1",
+            "X": 50,
+            "Y": 80,
+            "Width": 430,
+            "Height": 192,
+            "DataSeed": 670323627,
+            "NumberOfValues": 101,
+            "MaxY": 100.0,
+            "Precision": "1",
+            "LastIndex": 100,
+            "XAxisScale": 1.0,
+            "InsertRandomValues": true,
+            "LabelSizeTop": 20,
+            "LabelSizeBottom": 20,
+            "LabelSizeLeft": 52,
+            "LabelSizeRight": 32,
+            "GraphType": "GraphWrapClear",
+            "GraphDrawers": [
+              {
+                "Type": "LineDrawer",
+                "LineWidth": 2,
+                "FileNameImage": "",
+                "Color": {
+                  "Red": 20,
+                  "Green": 151,
+                  "Blue": 197
+                }
+              }
+            ],
+            "XAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 20.0,
+              "LineWidth": 1,
+              "Alpha": 128
+            },
+            "MinorXAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 10.0,
+              "LineWidth": 1,
+              "Alpha": 50
+            },
+            "YAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 20.0,
+              "LineWidth": 1,
+              "Alpha": 128
+            },
+            "MinorYAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 10.0,
+              "LineWidth": 1,
+              "Alpha": 50
+            },
+            "XAxisLabel": {
+              "Type": "GraphLabel",
+              "Interval": 20.0,
+              "DecimalSeparator": "Point",
+              "TextColor": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "TextId": "__SingleUse_TOFR",
+              "TextRotation": "0",
+              "Position": "Bottom"
+            },
+            "YAxisLabel": {
+              "Type": "GraphLabel",
+              "Interval": 10.0,
+              "DecimalSeparator": "Point",
+              "TextColor": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "TextId": "__SingleUse_QNYZ",
+              "TextRotation": "0",
+              "Position": "Left"
+            }
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_0",
+            "X": 124,
+            "Y": 8,
+            "Width": 40,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_1",
+            "X": 164,
+            "Y": 8,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_2",
+            "X": 221,
+            "Y": 8,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_3",
+            "X": 278,
+            "Y": 8,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaUp",
+            "X": 300,
+            "Y": 11,
+            "Width": 13,
+            "Height": 12,
+            "TextId": "__SingleUse_WSI1",
+            "TextRotation": "0",
+            "AutoSize": true
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_4",
+            "X": 335,
+            "Y": 8,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_5",
+            "X": 392,
+            "Y": 8,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 128,
+              "Green": 128,
+              "Blue": 128
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_6",
+            "X": 124,
+            "Y": 26,
+            "Width": 40,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_7",
+            "X": 164,
+            "Y": 26,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_8",
+            "X": 221,
+            "Y": 26,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_9",
+            "X": 278,
+            "Y": 26,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_10",
+            "X": 335,
+            "Y": 26,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_11",
+            "X": 392,
+            "Y": 26,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_12",
+            "X": 124,
+            "Y": 44,
+            "Width": 40,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_13",
+            "X": 164,
+            "Y": 44,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_14",
+            "X": 221,
+            "Y": 44,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_15",
+            "X": 278,
+            "Y": 44,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_16",
+            "X": 335,
+            "Y": 44,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_17",
+            "X": 392,
+            "Y": 44,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_18",
+            "X": 124,
+            "Y": 62,
+            "Width": 40,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_19",
+            "X": 164,
+            "Y": 62,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_20",
+            "X": 221,
+            "Y": 62,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_21",
+            "X": 278,
+            "Y": 62,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_22",
+            "X": 335,
+            "Y": 62,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderGrid_23",
+            "X": 392,
+            "Y": 62,
+            "Width": 57,
+            "Height": 18,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderFile",
+            "X": 61,
+            "Y": 8,
+            "Width": 21,
+            "Height": 17,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "BoxWithBorder",
+            "Name": "boxWithBorderPage",
+            "X": 89,
+            "Y": 8,
+            "Width": 21,
+            "Height": 17,
+            "Color": {
+              "Red": 255,
+              "Green": 255,
+              "Blue": 255
+            },
+            "BorderSize": 1
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaStage",
+            "X": 127,
+            "Y": 11,
+            "Width": 34,
+            "Height": 12,
+            "TextId": "__SingleUse_5TWW",
+            "TextRotation": "0",
+            "AutoSize": true
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaWeldT",
+            "X": 343,
+            "Y": 11,
+            "Width": 41,
+            "Height": 12,
+            "TextId": "__SingleUse_RMUO",
+            "TextRotation": "0",
+            "AutoSize": true
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaDown",
+            "X": 404,
+            "Y": 11,
+            "Width": 33,
+            "Height": 12,
+            "TextId": "__SingleUse_D40A",
+            "TextRotation": "0",
+            "AutoSize": true
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaCurr",
+            "X": 169,
+            "Y": 11,
+            "Width": 47,
+            "Height": 12,
+            "TextId": "__SingleUse_V731",
+            "TextRotation": "0",
+            "AutoSize": true
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textAreaSqCool",
+            "X": 225,
+            "Y": 11,
+            "Width": 49,
+            "Height": 12,
+            "TextId": "__SingleUse_2UKQ",
+            "TextRotation": "0",
+            "AutoSize": true
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen2",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 20,
+            "TextId": "__SingleUse_LRX3",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "Image",
+            "Name": "image1",
+            "X": 430,
+            "Width": 50,
+            "Height": 50,
+            "RelativeFilename": "__generated\\alternate_theme_images_widgets_radiobutton_radio_large_rounded_on_action.png"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen3",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 20,
+            "TextId": "__SingleUse_SNXV",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen4",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 20,
+            "TextId": "__SingleUse_BWHW",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen5",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 24,
+            "TextId": "__SingleUse_63PM",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      }
+    ],
+    "CustomContainerDefinitions": [
+      {
+        "Name": "LeftCtrl",
+        "Width": 50,
+        "Height": 272,
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1",
+            "Width": 50,
+            "Height": 272
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn5",
+            "Y": 222,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn4",
+            "Y": 166,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn3",
+            "Y": 111,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn2",
+            "Y": 55,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn1",
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          }
+        ],
+        "Interactions": [
+          {
+            "InteractionName": "Interaction1",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn1"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen1"
+            }
+          },
+          {
+            "InteractionName": "Interaction2",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn2"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen2"
+            }
+          },
+          {
+            "InteractionName": "Interaction3",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn3"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen3"
+            }
+          },
+          {
+            "InteractionName": "Interaction4",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn4"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen4"
+            }
+          },
+          {
+            "InteractionName": "Interaction5",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn5"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen5"
+            }
+          }
+        ]
+      }
+    ],
+    "Name": "MyApplication",
+    "Resolution": {
+      "Width": 480,
+      "Height": 272
+    },
+    "SelectedColorDepth": 24,
+    "StartupScreenName": "Screen1",
+    "SelectedStartupLanguage": "GB",
+    "TouchGfxPath": "../Middlewares/ST/touchgfx",
+    "UIPath": ".",
+    "AvailableColorDepths": [
+      24
+    ],
+    "AvailableLCDs": {
+      "24": "LCD24bpp"
+    },
+    "AvailableSections": [
+      "ExtFlashSection",
+      "IntFlashSection"
+    ],
+    "AvailableResolutions": [
+      {
+        "Width": 480,
+        "Height": 272
+      }
+    ],
+    "PhysicalButtons": [],
+    "FrameworkFeatures": {
+      "LCD24bpp": {
+        "Id": "LCD24bpp",
+        "IsEnabled": true
+      }
+    },
+    "GenerateAssetsCommand": "make -f simulator/gcc/Makefile assets -j8",
+    "PostGenerateCommand": "touchgfx update_project --project-file=simulator/msvs/Application.vcxproj",
+    "PostGenerateTargetCommand": "touchgfx update_project",
+    "CompileSimulatorCommand": "make -f simulator/gcc/Makefile -j8",
+    "RunSimulatorCommand": "build\\bin\\simulator.exe",
+    "LandscapeSkinX": 0,
+    "LandscapeSkinY": 0,
+    "PortraitSkinX": 0,
+    "PortraitSkinY": 0,
+    "DisplayOrientation": "Landscape",
+    "Family": "STM32H7",
+    "SubFamily": "STM32H725/735",
+    "Toolchain": "STM32CubeIDE",
+    "Platform": "m7",
+    "ProjectFile": "../weld3.ioc",
+    "OptionalComponentsRoot": "../Middlewares/ST/touchgfx_components",
+    "OptionalComponents": [],
+    "AdditionalFeatures": [
+      "CWRVector"
+    ]
+  },
+  "Version": "4.26.1"
+}

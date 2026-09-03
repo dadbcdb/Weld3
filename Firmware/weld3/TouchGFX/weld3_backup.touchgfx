@@ -1,0 +1,590 @@
+{
+  "Application": {
+    "Screens": [
+      {
+        "Name": "Screen1",
+        "CanvasBufferSize": 7200,
+        "Components": [
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          },
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "DynamicGraph",
+            "Name": "dynamicGraph1",
+            "X": 50,
+            "Width": 430,
+            "Height": 240,
+            "DataSeed": 670323627,
+            "NumberOfValues": 101,
+            "MaxY": 100.0,
+            "Precision": "1",
+            "LastIndex": 100,
+            "XAxisScale": 1.0,
+            "InsertRandomValues": true,
+            "LabelSizeTop": 20,
+            "LabelSizeBottom": 20,
+            "LabelSizeLeft": 50,
+            "LabelSizeRight": 10,
+            "GraphType": "GraphWrapClear",
+            "GraphDrawers": [
+              {
+                "Type": "LineDrawer",
+                "LineWidth": 2,
+                "FileNameImage": "",
+                "Color": {
+                  "Red": 20,
+                  "Green": 151,
+                  "Blue": 197
+                }
+              }
+            ],
+            "XAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 20.0,
+              "LineWidth": 1,
+              "Alpha": 128
+            },
+            "MinorXAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 10.0,
+              "LineWidth": 1,
+              "Alpha": 50
+            },
+            "YAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 20.0,
+              "LineWidth": 1,
+              "Alpha": 128
+            },
+            "MinorYAxisGrid": {
+              "Type": "GraphGrid",
+              "Color": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "Interval": 10.0,
+              "LineWidth": 1,
+              "Alpha": 50
+            },
+            "XAxisLabel": {
+              "Type": "GraphLabel",
+              "Interval": 20.0,
+              "DecimalSeparator": "Point",
+              "TextColor": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "TextId": "__SingleUse_TOFR",
+              "TextRotation": "0",
+              "Position": "Bottom"
+            },
+            "YAxisLabel": {
+              "Type": "GraphLabel",
+              "Interval": 10.0,
+              "DecimalSeparator": "Point",
+              "TextColor": {
+                "Red": 20,
+                "Green": 151,
+                "Blue": 197
+              },
+              "TextId": "__SingleUse_QNYZ",
+              "TextRotation": "0",
+              "Position": "Left"
+            }
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen2",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 24,
+            "TextId": "__SingleUse_LRX3",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "Image",
+            "Name": "image1",
+            "X": 430,
+            "Width": 50,
+            "Height": 50,
+            "RelativeFilename": "__generated\\alternate_theme_images_widgets_radiobutton_radio_large_rounded_on_action.png"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen3",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 20,
+            "TextId": "__SingleUse_SNXV",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen4",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 20,
+            "TextId": "__SingleUse_BWHW",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      },
+      {
+        "Name": "Screen5",
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1_1",
+            "X": 50,
+            "Width": 430,
+            "Height": 272
+          },
+          {
+            "Type": "TextArea",
+            "Name": "textArea1",
+            "X": 219,
+            "Y": 124,
+            "Width": 86,
+            "Height": 24,
+            "TextId": "__SingleUse_63PM",
+            "TextRotation": "0",
+            "Color": {
+              "Red": 17,
+              "Green": 35,
+              "Blue": 240
+            },
+            "AutoSize": true
+          },
+          {
+            "Type": "CustomContainerInstance",
+            "Name": "leftCtrl1",
+            "Width": 50,
+            "Height": 272,
+            "CustomContainerDefinitionName": "LeftCtrl"
+          }
+        ],
+        "Interactions": []
+      }
+    ],
+    "CustomContainerDefinitions": [
+      {
+        "Name": "LeftCtrl",
+        "Width": 50,
+        "Height": 272,
+        "Components": [
+          {
+            "Type": "Box",
+            "Name": "box1",
+            "Width": 50,
+            "Height": 272
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn5",
+            "Y": 222,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn4",
+            "Y": 166,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn3",
+            "Y": 111,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn2",
+            "Y": 55,
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          },
+          {
+            "Type": "FlexButton",
+            "Name": "flexBtn1",
+            "Width": 50,
+            "Height": 50,
+            "ButtonTrigger": {
+              "Type": "ClickButtonTrigger"
+            },
+            "ButtonStyles": [
+              {
+                "Type": "BoxWithBorderButtonStyle",
+                "Width": 50,
+                "Height": 50,
+                "LockToFlexButtonSize": true,
+                "BorderSize": 5,
+                "ColorReleased": {
+                  "Green": 102,
+                  "Blue": 153
+                },
+                "ColorPressed": {
+                  "Green": 153,
+                  "Blue": 204
+                },
+                "ColorBorderReleased": {
+                  "Green": 51,
+                  "Blue": 102
+                },
+                "ColorBorderPressed": {
+                  "Red": 51,
+                  "Green": 102,
+                  "Blue": 153
+                }
+              }
+            ]
+          }
+        ],
+        "Interactions": [
+          {
+            "InteractionName": "Interaction1",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn1"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen1"
+            }
+          },
+          {
+            "InteractionName": "Interaction2",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn2"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen2"
+            }
+          },
+          {
+            "InteractionName": "Interaction3",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn3"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen3"
+            }
+          },
+          {
+            "InteractionName": "Interaction4",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn4"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen4"
+            }
+          },
+          {
+            "InteractionName": "Interaction5",
+            "Trigger": {
+              "Type": "TriggerClicked",
+              "TriggerComponent": "flexBtn5"
+            },
+            "Action": {
+              "Type": "ActionGotoScreen",
+              "ScreenTransitionType": "ScreenTransitionNone",
+              "ActionComponent": "Screen5"
+            }
+          }
+        ]
+      }
+    ],
+    "Name": "MyApplication",
+    "Resolution": {
+      "Width": 480,
+      "Height": 272
+    },
+    "SelectedColorDepth": 24,
+    "StartupScreenName": "Screen1",
+    "SelectedStartupLanguage": "GB",
+    "TouchGfxPath": "../Middlewares/ST/touchgfx",
+    "UIPath": ".",
+    "AvailableColorDepths": [
+      24
+    ],
+    "AvailableLCDs": {
+      "24": "LCD24bpp"
+    },
+    "AvailableSections": [
+      "ExtFlashSection",
+      "IntFlashSection"
+    ],
+    "AvailableResolutions": [
+      {
+        "Width": 480,
+        "Height": 272
+      }
+    ],
+    "PhysicalButtons": [],
+    "FrameworkFeatures": {
+      "LCD24bpp": {
+        "Id": "LCD24bpp",
+        "IsEnabled": true
+      }
+    },
+    "GenerateAssetsCommand": "make -f simulator/gcc/Makefile assets -j8",
+    "PostGenerateCommand": "touchgfx update_project --project-file=simulator/msvs/Application.vcxproj",
+    "PostGenerateTargetCommand": "touchgfx update_project",
+    "CompileSimulatorCommand": "make -f simulator/gcc/Makefile -j8",
+    "RunSimulatorCommand": "build\\bin\\simulator.exe",
+    "LandscapeSkinX": 0,
+    "LandscapeSkinY": 0,
+    "PortraitSkinX": 0,
+    "PortraitSkinY": 0,
+    "DisplayOrientation": "Landscape",
+    "Family": "STM32H7",
+    "SubFamily": "STM32H725/735",
+    "Toolchain": "STM32CubeIDE",
+    "Platform": "m7",
+    "ProjectFile": "../weld3.ioc",
+    "OptionalComponentsRoot": "../Middlewares/ST/touchgfx_components",
+    "OptionalComponents": [],
+    "AdditionalFeatures": [
+      "Vector"
+    ]
+  },
+  "Version": "4.22.0"
+}

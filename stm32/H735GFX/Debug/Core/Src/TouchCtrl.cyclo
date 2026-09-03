@@ -1,0 +1,4 @@
+../Core/Src/TouchCtrl.cpp:15:9:int32_t I2C4_WriteReg(uint16_t, uint16_t, uint16_t, uint8_t*, uint16_t)	1
+../Core/Src/TouchCtrl.cpp:28:9:int32_t I2C4_ReadReg(uint16_t, uint16_t, uint16_t, uint8_t*, uint16_t)	1
+../Core/Src/TouchCtrl.cpp:34:6:void TouchTest()	2
+../Core/Src/TouchCtrl.cpp:54:6:void GetTouchState(CTouchState&)	3

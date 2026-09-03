@@ -1,0 +1,13 @@
+../Core/Src/xprintf.c:34:6:xOutCh	2
+../Core/Src/xprintf.c:42:5:_write	2
+../Core/Src/xprintf.c:63:12:ilog10	5
+../Core/Src/xprintf.c:85:15:i10x	5
+../Core/Src/xprintf.c:107:13:ftoa	21
+../Core/Src/xprintf.c:184:6:xputc	1
+../Core/Src/xprintf.c:192:6:xfputc	3
+../Core/Src/xprintf.c:212:6:xputs	1
+../Core/Src/xprintf.c:220:6:xfputs	2
+../Core/Src/xprintf.c:257:13:xvfprintf	47
+../Core/Src/xprintf.c:395:6:xprintf	1
+../Core/Src/xprintf.c:409:6:xfprintf	1
+../Core/Src/xprintf.c:424:6:xsprintf	1

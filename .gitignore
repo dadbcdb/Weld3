@@ -1,0 +1,23 @@
+# STM32CubeIDE build output
+Firmware/weld3/Debug/
+Firmware/weld3/Release/
+Firmware/weld3/.settings/
+
+# .NET/WPF build output and local publish folders
+**/bin/
+**/obj/
+WinApp/WeldApp/build_verify*/
+WinApp/WeldApp/WeldApp_LCD_*/
+WinApp/WeldApp/WeldApp/obj_test/
+WinApp/WeldApp/WeldApp/bin_test/
+
+# Local temporary material
+tmp/
+
+# IDE/user-local files
+Firmware/.metadata/
+.metadata/
+*.user
+*.suo
+*.launch
+.vs/

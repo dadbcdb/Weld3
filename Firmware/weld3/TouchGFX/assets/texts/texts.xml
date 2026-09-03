@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextDatabase xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="texts.xsd" Version="4.26.1">
+  <Languages>
+    <Language Id="GB" />
+  </Languages>
+  <Texts>
+    <TextGroup Id="Group1" />
+    <TextGroup Id="Unsorted">
+      <Text Id="PROFILE_VALUE" Alignment="Center" TypographyId="Small">
+        <Translation Language="GB">&lt;&gt;</Translation>
+      </Text>
+      <Text Id="__SingleUse_D40A" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">DOWN</Translation>
+      </Text>
+      <Text Id="__SingleUse_RMUO" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">WELD-T</Translation>
+      </Text>
+      <Text Id="__SingleUse_WSI1" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">UP</Translation>
+      </Text>
+      <Text Id="__SingleUse_V731" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">CURRENT</Translation>
+      </Text>
+      <Text Id="__SingleUse_5TWW" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">STAGE</Translation>
+      </Text>
+      <Text Id="__SingleUse_2UKQ" Alignment="Center" TypographyId="Small">
+        <Translation Language="GB">SQ/COOL</Translation>
+      </Text>
+      <Text Id="__SingleUse_QNYZ" Alignment="Right" TypographyId="Small">
+        <Translation Language="GB">&lt;&gt;</Translation>
+      </Text>
+      <Text Id="__SingleUse_63PM" Alignment="Left" TypographyId="Default">
+        <Translation Language="GB">screen 5</Translation>
+      </Text>
+      <Text Id="__SingleUse_BWHW" Alignment="Left" TypographyId="Default">
+        <Translation Language="GB">screen 4</Translation>
+      </Text>
+      <Text Id="__SingleUse_SNXV" Alignment="Left" TypographyId="Default">
+        <Translation Language="GB">screen 3</Translation>
+      </Text>
+      <Text Id="__SingleUse_LRX3" Alignment="Left" TypographyId="Default">
+        <Translation Language="GB">screen 2</Translation>
+      </Text>
+      <Text Id="__SingleUse_TOFR" Alignment="Left" TypographyId="Small">
+        <Translation Language="GB">&lt;&gt;</Translation>
+      </Text>
+    </TextGroup>
+  </Texts>
+  <Typographies>
+    <Typography Id="Default" Font="verdana.ttf" Size="20" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
+    <Typography Id="Large" Font="verdana.ttf" Size="40" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
+    <Typography Id="Small" Font="verdana.ttf" Size="10" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" WidgetWildcardCharacters="-., 0123456789" />
+    <Typography Id="Small1" Font="verdana.ttf" Size="15" Bpp="4" IsVector="no" Direction="LTR" FallbackCharacter="?" />
+  </Typographies>
+</TextDatabase>
