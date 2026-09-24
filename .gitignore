@@ -22,3 +22,7 @@ Firmware/.metadata/
 *.suo
 *.launch
 .vs/
+
+# STM32CubeIDE workspace artifacts and oversized local archive
+stm32/.metadata/
+stm32/H735GFX.zip
