@@ -1304,7 +1304,13 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim)
   else if(htim->Instance==TIM5)
   {
     /* USER CODE BEGIN TIM5_MspPostInit 0 */
-
+    /* Bench OR input: PA0 / Arduino D3 must never be driven by TIM5. */
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    GPIO_InitStruct.Pin = ARD_D3_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(ARD_D3_GPIO_Port, &GPIO_InitStruct);
+    return; /* Preserve generated mapping below, override in USER CODE. */
     /* USER CODE END TIM5_MspPostInit 0 */
 
     __HAL_RCC_GPIOA_CLK_ENABLE();

@@ -1,21 +1,637 @@
-<Window x:Class="WeldApp.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:WeldApp" Title="Weld3 - LCD STREAM v2" Height="780" Width="1250" MinHeight="700" MinWidth="1080" Background="#0B1220" Foreground="#E5E7EB" Closing="Window_Closing">
- <Window.Resources><Style TargetType="GroupBox"><Setter Property="Foreground" Value="#AFC2DB"/><Setter Property="Background" Value="#111C2E"/><Setter Property="BorderBrush" Value="#253550"/><Setter Property="Padding" Value="14"/></Style><Style TargetType="TextBox"><Setter Property="Background" Value="#0C1628"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#334A69"/><Setter Property="Padding" Value="7,5"/><Setter Property="Margin" Value="3"/></Style><Style TargetType="Button"><Setter Property="Background" Value="#1677FF"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="12,8"/><Setter Property="Margin" Value="5,0,0,0"/></Style></Window.Resources>
- <Grid Margin="18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="WELD3 CURRENT PROFILE" FontSize="25" FontWeight="Bold"/><TextBlock Text="설정 파형과 1회 용접 측정 파형 비교" Foreground="#7890AD"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Ellipse x:Name="ConnectionLed" Width="10" Height="10" Fill="#64748B" Margin="0,0,8,0"/><TextBlock x:Name="ConnectionText" Text="연결 안 됨"/></StackPanel></Grid>
-  <GroupBox Grid.Row="1" Header="장비 연결" Margin="0,12,0,12"><StackPanel Orientation="Horizontal"><TextBlock Text="IP" VerticalAlignment="Center"/><TextBox x:Name="IpAddressBox" Text="192.168.0.100" Width="160"/><TextBlock Text="포트" VerticalAlignment="Center" Margin="12,0,0,0"/><TextBox x:Name="PortBox" Text="5000" Width="75"/><CheckBox x:Name="SimulationCheckBox" Content="시뮬레이션" VerticalAlignment="Center" Foreground="#AFC2DB" Margin="16,0"/><TextBlock x:Name="LastUpdateText" Text="마지막 수신: -" VerticalAlignment="Center" Foreground="#7890AD" Margin="12,0"/><Button x:Name="ConnectButton" Content="연결" Click="ConnectButton_Click"/><Button x:Name="DisconnectButton" Content="연결 해제" Background="#34435A" IsEnabled="False" Click="DisconnectButton_Click"/><Button x:Name="CaptureScreenButton" Content="LCD 캡처" Background="#0F766E" IsEnabled="False" Click="CaptureScreenButton_Click"/><Grid x:Name="CaptureProgressPanel" Width="145" Height="28" Margin="10,0,0,0" Visibility="Collapsed" VerticalAlignment="Center"><ProgressBar x:Name="CaptureProgressBar" Minimum="0" Maximum="100" Value="0"/><TextBlock x:Name="CaptureProgressText" Text="요청 중" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#0B1220" FontWeight="Bold"/></Grid></StackPanel></GroupBox>
-  <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition Width="445"/><ColumnDefinition/></Grid.ColumnDefinitions>
-   <GroupBox Header="3단 용접 설정 (Ctrl+C / Ctrl+V)" Margin="0,0,12,0"><Grid VerticalAlignment="Top"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Border Background="#0C1628" BorderBrush="#334A69" BorderThickness="1" Padding="8" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="64"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="64"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="파일" VerticalAlignment="Center" Margin="0,0,6,0"/><ComboBox x:Name="ProfileFileBox" Grid.Column="1" ItemsSource="{Binding ProfileNumbers}" SelectedIndex="0" SelectionChanged="ProfileSelectionChanged"/><TextBlock Grid.Column="2" Text="번호" VerticalAlignment="Center" Margin="10,0,6,0"/><ComboBox x:Name="ProfileNumberBox" Grid.Column="3" ItemsSource="{Binding ProfileNumbers}" SelectedIndex="0" SelectionChanged="ProfileSelectionChanged"/><Button x:Name="SetProfileButton" Grid.Column="5" Content="SET" IsEnabled="False" Padding="18,7" Click="SetProfileButton_Click"/></Grid></Border>
-    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,8"><Button Content="파일 로드" Background="#34435A" Margin="0,0,4,0" Click="LoadFileButton_Click"/><Button Content="파일 저장" Background="#0F766E" Margin="0,0,4,0" Click="SaveFileButton_Click"/><Button x:Name="LoadProfileButton" Content="장비 불러오기" Background="#34435A" Margin="0,0,4,0" IsEnabled="False" Click="LoadProfileButton_Click"/><Button x:Name="SaveProfileButton" Content="장비 저장" Background="#0F766E" Margin="0" IsEnabled="False" Click="SaveProfileButton_Click"/></UniformGrid>
-    <DataGrid Grid.Row="2" x:Name="SettingsGrid" Width="402" HorizontalAlignment="Left" ItemsSource="{Binding StageRows}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserReorderColumns="False" CanUserResizeRows="False" FrozenColumnCount="1" SelectionUnit="Cell" SelectionMode="Extended" ClipboardCopyMode="ExcludeHeader" PreviewMouseLeftButtonDown="SettingsGrid_PreviewMouseLeftButtonDown" PreviewKeyDown="SettingsGrid_PreviewKeyDown" BeginningEdit="SettingsGrid_BeginningEdit" CellEditEnding="SettingsGrid_CellEditEnding" Background="#0C1628" Foreground="White" BorderBrush="#334A69" HeadersVisibility="Column" RowHeight="38" ColumnHeaderHeight="34" HorizontalGridLinesBrush="#334A69" VerticalGridLinesBrush="#334A69" HorizontalScrollBarVisibility="Disabled">
-     <DataGrid.Resources><Style TargetType="DataGridColumnHeader"><Setter Property="Background" Value="#1D2B40"/><Setter Property="Foreground" Value="#DCEBFF"/><Setter Property="BorderBrush" Value="#3B506D"/><Setter Property="BorderThickness" Value="0,0,1,1"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="FontWeight" Value="SemiBold"/></Style><Style TargetType="DataGridRow"><Setter Property="Background" Value="#0F1C2F"/><Setter Property="Foreground" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#334A69"/></Style><Style TargetType="DataGridCell"><Setter Property="Background" Value="#0F1C2F"/><Setter Property="Foreground" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#334A69"/><Setter Property="Padding" Value="8,5"/><Setter Property="VerticalContentAlignment" Value="Center"/><Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="#1677FF"/><Setter Property="Foreground" Value="White"/></Trigger></Style.Triggers></Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#FFFFFF"/><Setter Property="VerticalAlignment" Value="Center"/></Style><Style TargetType="TextBox"><Setter Property="Background" Value="#132743"/><Setter Property="Foreground" Value="#FFFFFF"/><Setter Property="CaretBrush" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#38BDF8"/><Setter Property="Padding" Value="6,3"/></Style></DataGrid.Resources>
-     <DataGrid.Columns><DataGridTextColumn Header="단" Binding="{Binding StageName}" IsReadOnly="True" Width="52"/><DataGridTextColumn Header="전류" Binding="{Binding Current, UpdateSourceTrigger=PropertyChanged}" Width="68"/><DataGridTextColumn Header="SQ/COOL" Binding="{Binding Cool, UpdateSourceTrigger=PropertyChanged}" Width="76"/><DataGridTextColumn Header="UP" Binding="{Binding Up, UpdateSourceTrigger=PropertyChanged}" Width="64"/><DataGridTextColumn Header="Weld Time" Binding="{Binding Hold, UpdateSourceTrigger=PropertyChanged}" Width="78"/><DataGridTextColumn Header="DOWN" Binding="{Binding Down, UpdateSourceTrigger=PropertyChanged}" Width="60"/></DataGrid.Columns>
-    </DataGrid>
-    <Grid Grid.Row="3" Margin="0,10"><StackPanel Orientation="Horizontal"><Button Content="선택 복사" Background="#34435A" Margin="0" Click="CopyButton_Click"/><Button Content="붙여넣기" Background="#34435A" Click="PasteButton_Click"/><Button x:Name="StartCycleButton" Content="1회 START" Background="#DC2626" IsEnabled="False" Click="StartButton_Click"/></StackPanel></Grid>
-    <StackPanel Grid.Row="4"><Separator Margin="0,4,0,10" Background="#253550"/><Grid><TextBlock Text="실측 전류" Foreground="#7890AD"/><TextBlock x:Name="CurrentValueText" Text="0.00 A" HorizontalAlignment="Right" FontSize="25" FontWeight="Bold"/></Grid><Grid Margin="0,8,0,0"><TextBlock Text="용접 상태" Foreground="#7890AD"/><TextBlock x:Name="WeldingStateText" Text="대기 / 결과 대기" HorizontalAlignment="Right" FontSize="18" FontWeight="Bold"/></Grid><Grid Margin="0,8,0,0"><TextBlock Text="FAULT" Foreground="#7890AD"/><TextBlock x:Name="FaultStateText" Text="정상" HorizontalAlignment="Right" Foreground="#4ADE80"/></Grid><TextBlock x:Name="WeldTimeText" Text="용접 시간: 0 ms" HorizontalAlignment="Right" Margin="0,8,0,0"/></StackPanel>
-   </Grid></GroupBox>
-   <GroupBox Grid.Column="1" Header="설정(녹색) / 실제 용접 결과(하늘색)"><local:WaveformPreview x:Name="SettingWaveform"/></GroupBox>
-  </Grid>
-  <Border Grid.Row="3" Background="#111C2E" BorderBrush="#253550" BorderThickness="1" Padding="10" Margin="0,12,0,0"><TextBlock x:Name="StatusText" Text="외부 용접 시작을 기다립니다. 용접 한 사이클이 끝나면 결과 파형이 고정됩니다." Foreground="#93A8C3"/></Border>
- </Grid>
+<Window
+    x:Class="WeldApp.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:WeldApp"
+    Title="Weld3 - PWM 단발 시험"
+    Height="900"
+    Width="1250"
+    MinHeight="700"
+    MinWidth="1080"
+    Background="#0B1220"
+    Foreground="#E5E7EB"
+    Closing="Window_Closing">
+    <Window.Resources>
+        <Style
+            TargetType="GroupBox">
+            <Setter
+                Property="Foreground"
+                Value="#AFC2DB" />
+            <Setter
+                Property="Background"
+                Value="#111C2E" />
+            <Setter
+                Property="BorderBrush"
+                Value="#253550" />
+            <Setter
+                Property="Padding"
+                Value="14" />
+        </Style>
+        <Style
+            TargetType="TextBox">
+            <Setter
+                Property="Background"
+                Value="#0C1628" />
+            <Setter
+                Property="Foreground"
+                Value="White" />
+            <Setter
+                Property="BorderBrush"
+                Value="#334A69" />
+            <Setter
+                Property="Padding"
+                Value="7,5" />
+            <Setter
+                Property="Margin"
+                Value="3" />
+        </Style>
+        <Style
+            TargetType="Button">
+            <Setter
+                Property="Background"
+                Value="#1677FF" />
+            <Setter
+                Property="Foreground"
+                Value="White" />
+            <Setter
+                Property="BorderThickness"
+                Value="0" />
+            <Setter
+                Property="Padding"
+                Value="12,8" />
+            <Setter
+                Property="Margin"
+                Value="5,0,0,0" />
+        </Style>
+    </Window.Resources>
+    <Grid
+        Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition
+                Height="Auto" />
+            <RowDefinition
+                Height="Auto" />
+            <RowDefinition />
+            <RowDefinition
+                Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition
+                    Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock
+                    Text="WELD3 CURRENT PROFILE"
+                    FontSize="25"
+                    FontWeight="Bold" />
+                <TextBlock
+                    Text="설정 파형과 1회 용접 측정 파형 비교"
+                    Foreground="#7890AD" />
+            </StackPanel>
+            <StackPanel
+                Grid.Column="1"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+                <Ellipse
+                    x:Name="ConnectionLed"
+                    Width="10"
+                    Height="10"
+                    Fill="#64748B"
+                    Margin="0,0,8,0" />
+                <TextBlock
+                    x:Name="ConnectionText"
+                    Text="연결 안 됨" />
+            </StackPanel>
+        </Grid>
+        <GroupBox
+            Grid.Row="1"
+            Header="장비 연결"
+            Margin="0,12,0,12">
+            <StackPanel
+                Orientation="Horizontal">
+                <TextBlock
+                    Text="IP"
+                    VerticalAlignment="Center" />
+                <TextBox
+                    x:Name="IpAddressBox"
+                    Text="192.168.0.100"
+                    Width="160" />
+                <TextBlock
+                    Text="포트"
+                    VerticalAlignment="Center"
+                    Margin="12,0,0,0" />
+                <TextBox
+                    x:Name="PortBox"
+                    Text="5000"
+                    Width="75" />
+                <CheckBox
+                    x:Name="SimulationCheckBox"
+                    Content="시뮬레이션"
+                    VerticalAlignment="Center"
+                    Foreground="#AFC2DB"
+                    Margin="16,0" />
+                <TextBlock
+                    x:Name="LastUpdateText"
+                    Text="마지막 수신: -"
+                    VerticalAlignment="Center"
+                    Foreground="#7890AD"
+                    Margin="12,0" />
+                <Button
+                    x:Name="ConnectButton"
+                    Content="연결"
+                    Click="ConnectButton_Click" />
+                <Button
+                    x:Name="DisconnectButton"
+                    Content="연결 해제"
+                    Background="#34435A"
+                    IsEnabled="False"
+                    Click="DisconnectButton_Click" />
+                <Button
+                    x:Name="CaptureScreenButton"
+                    Content="LCD 캡처"
+                    Background="#0F766E"
+                    IsEnabled="False"
+                    Click="CaptureScreenButton_Click" />
+                <Grid
+                    x:Name="CaptureProgressPanel"
+                    Width="145"
+                    Height="28"
+                    Margin="10,0,0,0"
+                    Visibility="Collapsed"
+                    VerticalAlignment="Center">
+                    <ProgressBar
+                        x:Name="CaptureProgressBar"
+                        Minimum="0"
+                        Maximum="100"
+                        Value="0" />
+                    <TextBlock
+                        x:Name="CaptureProgressText"
+                        Text="요청 중"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Foreground="#0B1220"
+                        FontWeight="Bold" />
+                </Grid>
+            </StackPanel>
+        </GroupBox>
+        <Grid
+            Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition
+                    Width="445" />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <GroupBox
+                Header="3단 용접 설정 (Ctrl+C / Ctrl+V)"
+                Margin="0,0,12,0">
+                <ScrollViewer
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+                    <Grid
+                        VerticalAlignment="Top">
+                        <Grid.RowDefinitions>
+                            <RowDefinition
+                                Height="Auto" />
+                            <RowDefinition
+                                Height="Auto" />
+                            <RowDefinition
+                                Height="Auto" />
+                            <RowDefinition
+                                Height="Auto" />
+                            <RowDefinition
+                                Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Border
+                            Background="#0C1628"
+                            BorderBrush="#334A69"
+                            BorderThickness="1"
+                            Padding="8"
+                            Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition
+                                        Width="Auto" />
+                                    <ColumnDefinition
+                                        Width="64" />
+                                    <ColumnDefinition
+                                        Width="Auto" />
+                                    <ColumnDefinition
+                                        Width="64" />
+                                    <ColumnDefinition />
+                                    <ColumnDefinition
+                                        Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Text="파일"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,6,0" />
+                                <ComboBox
+                                    x:Name="ProfileFileBox"
+                                    Grid.Column="1"
+                                    ItemsSource="{Binding ProfileNumbers}"
+                                    SelectedIndex="0"
+                                    SelectionChanged="ProfileSelectionChanged" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Text="번호"
+                                    VerticalAlignment="Center"
+                                    Margin="10,0,6,0" />
+                                <ComboBox
+                                    x:Name="ProfileNumberBox"
+                                    Grid.Column="3"
+                                    ItemsSource="{Binding ProfileNumbers}"
+                                    SelectedIndex="0"
+                                    SelectionChanged="ProfileSelectionChanged" />
+                                <Button
+                                    x:Name="SetProfileButton"
+                                    Grid.Column="5"
+                                    Content="SET"
+                                    IsEnabled="False"
+                                    Padding="18,7"
+                                    Click="SetProfileButton_Click" />
+                            </Grid>
+                        </Border>
+                        <UniformGrid
+                            Grid.Row="1"
+                            Columns="4"
+                            Margin="0,0,0,8">
+                            <Button
+                                Content="파일 로드"
+                                Background="#34435A"
+                                Margin="0,0,4,0"
+                                Click="LoadFileButton_Click" />
+                            <Button
+                                Content="파일 저장"
+                                Background="#0F766E"
+                                Margin="0,0,4,0"
+                                Click="SaveFileButton_Click" />
+                            <Button
+                                x:Name="LoadProfileButton"
+                                Content="장비 불러오기"
+                                Background="#34435A"
+                                Margin="0,0,4,0"
+                                IsEnabled="False"
+                                Click="LoadProfileButton_Click" />
+                            <Button
+                                x:Name="SaveProfileButton"
+                                Content="장비 저장"
+                                Background="#0F766E"
+                                Margin="0"
+                                IsEnabled="False"
+                                Click="SaveProfileButton_Click" />
+                        </UniformGrid>
+                        <DataGrid
+                            Grid.Row="2"
+                            x:Name="SettingsGrid"
+                            Width="402"
+                            HorizontalAlignment="Left"
+                            ItemsSource="{Binding StageRows}"
+                            AutoGenerateColumns="False"
+                            CanUserAddRows="False"
+                            CanUserDeleteRows="False"
+                            CanUserReorderColumns="False"
+                            CanUserResizeRows="False"
+                            FrozenColumnCount="1"
+                            SelectionUnit="Cell"
+                            SelectionMode="Extended"
+                            ClipboardCopyMode="ExcludeHeader"
+                            PreviewMouseLeftButtonDown="SettingsGrid_PreviewMouseLeftButtonDown"
+                            PreviewKeyDown="SettingsGrid_PreviewKeyDown"
+                            BeginningEdit="SettingsGrid_BeginningEdit"
+                            CellEditEnding="SettingsGrid_CellEditEnding"
+                            Background="#0C1628"
+                            Foreground="White"
+                            BorderBrush="#334A69"
+                            HeadersVisibility="Column"
+                            RowHeight="38"
+                            ColumnHeaderHeight="34"
+                            HorizontalGridLinesBrush="#334A69"
+                            VerticalGridLinesBrush="#334A69"
+                            HorizontalScrollBarVisibility="Disabled">
+                            <DataGrid.Resources>
+                                <Style
+                                    TargetType="DataGridColumnHeader">
+                                    <Setter
+                                        Property="Background"
+                                        Value="#1D2B40" />
+                                    <Setter
+                                        Property="Foreground"
+                                        Value="#DCEBFF" />
+                                    <Setter
+                                        Property="BorderBrush"
+                                        Value="#3B506D" />
+                                    <Setter
+                                        Property="BorderThickness"
+                                        Value="0,0,1,1" />
+                                    <Setter
+                                        Property="HorizontalContentAlignment"
+                                        Value="Center" />
+                                    <Setter
+                                        Property="FontWeight"
+                                        Value="SemiBold" />
+                                </Style>
+                                <Style
+                                    TargetType="DataGridRow">
+                                    <Setter
+                                        Property="Background"
+                                        Value="#0F1C2F" />
+                                    <Setter
+                                        Property="Foreground"
+                                        Value="#FFFFFF" />
+                                    <Setter
+                                        Property="BorderBrush"
+                                        Value="#334A69" />
+                                </Style>
+                                <Style
+                                    TargetType="DataGridCell">
+                                    <Setter
+                                        Property="Background"
+                                        Value="#0F1C2F" />
+                                    <Setter
+                                        Property="Foreground"
+                                        Value="#FFFFFF" />
+                                    <Setter
+                                        Property="BorderBrush"
+                                        Value="#334A69" />
+                                    <Setter
+                                        Property="Padding"
+                                        Value="8,5" />
+                                    <Setter
+                                        Property="VerticalContentAlignment"
+                                        Value="Center" />
+                                    <Style.Triggers>
+                                        <Trigger
+                                            Property="IsSelected"
+                                            Value="True">
+                                            <Setter
+                                                Property="Background"
+                                                Value="#1677FF" />
+                                            <Setter
+                                                Property="Foreground"
+                                                Value="White" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                                <Style
+                                    TargetType="TextBlock">
+                                    <Setter
+                                        Property="Foreground"
+                                        Value="#FFFFFF" />
+                                    <Setter
+                                        Property="VerticalAlignment"
+                                        Value="Center" />
+                                </Style>
+                                <Style
+                                    TargetType="TextBox">
+                                    <Setter
+                                        Property="Background"
+                                        Value="#132743" />
+                                    <Setter
+                                        Property="Foreground"
+                                        Value="#FFFFFF" />
+                                    <Setter
+                                        Property="CaretBrush"
+                                        Value="#FFFFFF" />
+                                    <Setter
+                                        Property="BorderBrush"
+                                        Value="#38BDF8" />
+                                    <Setter
+                                        Property="Padding"
+                                        Value="6,3" />
+                                </Style>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn
+                                    Header="단"
+                                    Binding="{Binding StageName}"
+                                    IsReadOnly="True"
+                                    Width="52" />
+                                <DataGridTextColumn
+                                    Header="ADC 목표"
+                                    Binding="{Binding Current, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="68" />
+                                <DataGridTextColumn
+                                    Header="SQ/COOL"
+                                    Binding="{Binding Cool, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="76" />
+                                <DataGridTextColumn
+                                    Header="UP"
+                                    Binding="{Binding Up, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="64" />
+                                <DataGridTextColumn
+                                    Header="Weld Time"
+                                    Binding="{Binding Hold, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="78" />
+                                <DataGridTextColumn
+                                    Header="DOWN"
+                                    Binding="{Binding Down, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="60" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel
+                            Grid.Row="3"
+                            Margin="0,10">
+                            <StackPanel
+                                Orientation="Horizontal">
+                                <Button
+                                    Content="선택 복사"
+                                    Background="#34435A"
+                                    Margin="0"
+                                    Click="CopyButton_Click" />
+                                <Button
+                                    Content="붙여넣기"
+                                    Background="#34435A"
+                                    Click="PasteButton_Click" />
+                                <Button
+                                    x:Name="StartCycleButton"
+                                    Content="1회 START"
+                                    Background="#DC2626"
+                                    IsEnabled="False"
+                                    Click="StartButton_Click" />
+                                <Button
+                                    x:Name="StopCycleButton"
+                                    Content="STOP"
+                                    Background="#B91C1C"
+                                    IsEnabled="False"
+                                    Click="StopButton_Click" />
+                            </StackPanel>
+                            <WrapPanel
+                                Margin="0,10,0,0">
+                                <CheckBox
+                                    x:Name="PwmTestCheckBox"
+                                    Content="PWM 단발 시험 (PID OFF)"
+                                    Foreground="White"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    Text="상한 / 각 상 (%)"
+                                    VerticalAlignment="Center"
+                                    Margin="8,0,0,0" />
+                                <TextBox
+                                    x:Name="TestDutyBox"
+                                    Text="5"
+                                    Width="45"
+                                    ToolTip="1~45%. 최대 ADC 목표을 이 듀티에 맞추고 나머지 단계는 비례 적용합니다." />
+                            </WrapPanel>
+                            <WrapPanel
+                                Margin="0,7,0,0">
+                                <CheckBox
+                                    x:Name="PidEnableCheckBox"
+                                    Content="PID 사용"
+                                    Foreground="#FBBF24"
+                                    VerticalAlignment="Center" />
+                                <TextBlock
+                                    Text="Kp"
+                                    Margin="8,0,2,0"
+                                    VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Name="PidKpBox"
+                                    Text="0.2"
+                                    Width="52" />
+                                <TextBlock
+                                    Text="Ki"
+                                    Margin="6,0,2,0"
+                                    VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Name="PidKiBox"
+                                    Text="15"
+                                    Width="52" />
+                                <TextBlock
+                                    Text="Kd"
+                                    Margin="6,0,2,0"
+                                    VerticalAlignment="Center" />
+                                <TextBox
+                                    x:Name="PidKdBox"
+                                    Text="0"
+                                    Width="52" />
+                                <Button
+                                    x:Name="ApplyPidButton"
+                                    Content="PID 적용"
+                                    Click="ApplyPidButton_Click" />
+                            </WrapPanel>
+                            <TextBlock
+                                Text="PID 목표는 표의 ADC 값(0~65535)입니다. UP/DOWN은 목표 상승·하강 시간입니다. 기존 파일의 숫자는 그대로 ADC 값으로 해석됩니다."
+                                Foreground="#FBBF24"
+                                TextWrapping="Wrap"
+                                Margin="0,4,0,0" />
+                            <TextBlock
+                                x:Name="TestStateText"
+                                Text="시험 대기 · 부팅 시 PWM OFF"
+                                Foreground="#93A8C3"
+                                Margin="0,5,0,0"
+                                TextWrapping="Wrap" />
+                            <Button
+                                x:Name="SaveTestTraceButton"
+                                Content="시험 기록 CSV 저장"
+                                Click="SaveTestTrace_Click"
+                                IsEnabled="False"
+                                HorizontalAlignment="Left"
+                                Margin="0,7,0,0" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Row="4">
+                            <Separator
+                                Margin="0,4,0,10"
+                                Background="#253550" />
+                            <Grid>
+                                <TextBlock
+                                    Text="실측 전류"
+                                    Foreground="#7890AD" />
+                                <TextBlock
+                                    x:Name="CurrentValueText"
+                                    Text="0.00 A"
+                                    HorizontalAlignment="Right"
+                                    FontSize="25"
+                                    FontWeight="Bold" />
+                            </Grid>
+                            <Button Content="ADC 측정창" Click="OpenAdcWindow_Click" Margin="0,10,0,0" HorizontalAlignment="Left" />
+                            <Grid
+                                Margin="0,8,0,0">
+                                <TextBlock
+                                    Text="용접 상태"
+                                    Foreground="#7890AD" />
+                                <TextBlock
+                                    x:Name="WeldingStateText"
+                                    Text="대기 / 결과 대기"
+                                    HorizontalAlignment="Right"
+                                    FontSize="18"
+                                    FontWeight="Bold" />
+                            </Grid>
+                            <Grid
+                                Margin="0,8,0,0">
+                                <TextBlock
+                                    Text="FAULT"
+                                    Foreground="#7890AD" />
+                                <TextBlock
+                                    x:Name="FaultStateText"
+                                    Text="정상"
+                                    HorizontalAlignment="Right"
+                                    Foreground="#4ADE80" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="WeldTimeText"
+                                Text="용접 시간: 0 ms"
+                                HorizontalAlignment="Right"
+                                Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </GroupBox>
+            <TabControl
+                Grid.Column="1"
+                x:Name="WaveTabs"
+                Background="#111C2E"
+                BorderBrush="#253550">
+                <TabItem
+                    Header="ADC 목표 파형">
+                    <GroupBox
+                        Header="설정 ADC 목표 (0~65535)">
+                        <local:WaveformPreview
+                            x:Name="SettingWaveform" />
+                    </GroupBox>
+                </TabItem>
+                <TabItem
+                    Header="PWM 시험 결과">
+                    <GroupBox
+                        Header="각 상 듀티 % · 설정(녹색) / 기록된 명령(하늘색)">
+                        <local:WaveformPreview
+                            x:Name="TestWaveform" />
+                    </GroupBox>
+                </TabItem>
+            </TabControl>
+        </Grid>
+        <Border
+            Grid.Row="3"
+            Background="#111C2E"
+            BorderBrush="#253550"
+            BorderThickness="1"
+            Padding="10"
+            Margin="0,12,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition
+                        Height="Auto" />
+                    <RowDefinition
+                        Height="105" />
+                </Grid.RowDefinitions>
+                <TextBlock
+                    x:Name="StatusText"
+                    Text="외부 용접 시작을 기다립니다. 용접 한 사이클이 끝나면 결과 파형이 고정됩니다."
+                    Foreground="#93A8C3" />
+                <TextBox
+                    x:Name="LogTextBox"
+                    Grid.Row="1"
+                    Margin="0,8,0,0"
+                    IsReadOnly="True"
+                    IsReadOnlyCaretVisible="False"
+                    AcceptsReturn="True"
+                    TextWrapping="NoWrap"
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Auto"
+                    FontFamily="Consolas"
+                    FontSize="11" />
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

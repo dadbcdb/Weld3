@@ -1,5 +1,254 @@
 # Design Decisions
 
+## 2026-09-24 — Stage values are direct ADC targets
+
+User requested replacing stage current entries with ADC codes. Accept 0..65535
+in WinApp, protocol validation and the single-shot sequencer. PID error is
+(profile ADC target / 65535) minus normalized filtered ADC1. Legacy PID target
+field remains in the protocol but is unused; remove its UI control. GET PID
+reports target_mode=stage_adc and WinApp verifies this before starting a test.
+Protocol/profile field names currentN_a and stage_current_a remain for storage
+compatibility: existing numbers are NOT converted; 100 now means ADC 100.
+Open-loop continues proportional profile-height-to-duty mapping. This change
+does not calibrate amperes or update the separate embedded LCD's unit labels.
+
+## 2026-09-24 — Separate Rogowski channel and ADC plot scaling
+
+At user request, change runtime ADC2 rank 1 to channel 1 (PA1_C/A3); ADC1
+stays channel 0 (PA0_C/A2). Preserve open analogue switches, PWM waveform,
+trigger timing and filtering. Generated init/.ioc is not changed; retain the
+USER CODE override when regenerating. ADC plots independently choose a zero-based
+upper bound from raw/filtered peaks with 10% headroom, rounded and capped at
+65535, minimum span 100 codes. Both lines within each plot share that scale.
+
+## 2026-09-24 — ADC graph trace
+
+Use device single-shot records for separate ADC graphs rather than sparse host
+polls. Append three secondary/filter fields to TEST TRACE rows; new WinApp accepts
+6 or 9 fields. Older WinApp requires an update for 9-field traces. Sampling,
+PWM timing and controller math are unchanged; static trace storage grows 24 KiB.
+
+## 2026-09-24 — Secondary telemetry
+
+Expose ADC2 raw mean and normalized filtered value in both status replies.
+Use integer millionths to avoid embedded printf float support. WinApp labels
+the raw/normalized units and existing shared PA0_C input explicitly; no ampere
+calibration or independent Rogowski channel mapping is inferred.
+
+## 2026-09-24 — Secondary/Rogowski-path feedback filter
+
+- Add independent 1-ms first-order IIR to ADC2 half-block means, updated for
+  every valid published DMA block even while no waveform test is active.
+  Seed from first valid sample after acquisition init to avoid startup bias.
+- g_secondaryCurrentFiltered exposes normalized 0..1 feedback; raw mean/min/max
+  remain unchanged. This filter does not perform Rogowski integration or current
+  calibration and is not connected to a secondary compensation loop.
+- Existing bench ADC1/ADC2 channel-0 duplicate PA0_C mapping is retained.
+  No PWM/pin/trigger/protection changes; expected PWM timing remains unchanged.
+
+## 2026-09-24 — PID feedback low-pass trial
+
+- User requested filtering. Apply a first-order IIR to normalized ADC half-block
+  means before PID P/I/D: y += alpha*(x-y), alpha=dt/(0.001+dt).
+  Compute alpha at start; seed state from the current raw mean. At nominal
+  119.16-us updates alpha is about .1065. Step response takes about 3.2 ms
+  to reach 95%; this is added measurement lag requiring bench retuning.
+- g_wavePidFiltered exposes the filtered 0..1 value to the debugger. Raw ADC
+  diagnostics/CSV remain unfiltered. No UI coefficient adjustment is added.
+- No duty slew limit, pin/phase/sample timing change or delayed stop is added.
+  Zero-envelope immediately requests zero; STOP/fault still forces pins LOW.
+  Expect smoother duty corrections rather than a forced duty ramp; actual
+  stability, IRQ execution time and scope response remain target tests.
+
+## 2026-09-23 — Normalized ADC PID single-shot bench mode
+
+- TEST START now uses the stored PID enabled flag. WinApp explicitly sets and
+  reads back PID parameters before starting. Open-loop checkbox takes priority;
+  unchecked plus PID enabled selects closed-loop; both unchecked keeps dry-run.
+- Feedback is ADC1 half-block mean / 65535 on PA0_C, not amperes or diode-OR
+  occupancy. Target is configured peak target times relative profile height.
+  PID runs once per 32 pairs (nominal 119.16 us), with measurement derivative,
+  conditional integration and per-phase duty cap. The initially added 1.0 duty/s
+  upward slew was removed at user request because it masked PID step response.
+  Duty now follows the bounded PID result at each acquisition callback; normal
+  compare-latch latency remains. With zero feedback, Kp=.2, target=.5 and a 5%
+  cap, expect a step to 5% rather than a 50-ms ramp. Pin mapping is unchanged.
+  Zero target resets controller; start resets history. Stops/lease remain active.
+- PB7/PD15 polarity, timer phase centers and sample locations are unchanged.
+  Expect equal A/B widths, centers T/2 apart, varying within selected duty cap;
+  SQ/COOL/end remain LOW. This is uncalibrated bench control, not verified
+  power-stage current regulation. No flashing or energized test performed.
+
+## 2026-09-15 — WinApp waveform as an explicit open-loop single-shot test
+
+- User requested using the WinApp three-stage waveform for test output after
+  clarifying existing production SG3525 hardware and hardware protection.
+  Keep original START as timing-only dry-run; add TEST START duty_percent=N,
+  TEST STATUS, TEST TRACE and STOP. No implicit power action occurs on connect,
+  SET, profile load, boot or an ordinary START.
+- Default PWM_WAVE_TEST_ENABLE=1 replaces boot OR-PI activity with zero output.
+  Snapshot and independently validate all stage settings at TEST START. Map
+  the highest stage current to a separate per-phase duty cap (UI default 5%,
+  accepted software range 1..45%); preserve relative stage heights and times.
+  Values in amperes define shape only, not a calibrated current-to-duty law.
+- DMA processing at priority 4 advances the finite sequence from sample-pair
+  counts, independent of host polling and RTOS task scheduling. Envelope values
+  use millisecond resolution. Comparisons are still staged at safe alternating
+  timer extrema. Allow three acquisition halves for zero compares to settle
+  before restoring timer pin function for a new run. There is no auto-repeat.
+- HAL TIM23 tick independently stops an active run when ADC processing has
+  been absent for more than 3 ms or TEST STATUS lease has expired for more than
+  1000 ms. Detected TCP disconnect and STOP also force outputs LOW. Existing
+  acquisition faults remain latched; normal completion/STOP can be restarted.
+  CPU/global interrupt halt is not covered by these software guards.
+- Keep up to 2048 trace records in RAM, with adaptive 1..5-ms logging intervals
+  over the permitted profile (up to 8994 ms), including start/final records.
+  Trace has time, profile target, commanded per-phase duty and raw ADC mean/
+  min/max. It is not a full ADC capture or a measurement of gate pulse widths;
+  short features can fall between retained samples on long profiles.
+- Trace retrieval is allowed after completion, with run-id/count validation.
+  Active output rejects settings/storage/capture/new-start commands; STOP and
+  status stay available. WinApp sends the currently displayed settings before
+  starting, locks test controls, retrieves the completed trace and can save CSV.
+  A separate duty graph avoids presenting ADC values as actual current.
+- All main.c runtime changes remain within USER CODE. No .ioc timer/pin
+  reassignment is introduced. Retain these overrides across regeneration.
+- ARM incremental link, .NET Release build, 12 host tests and an offscreen WPF
+  simulation/render check passed. The host test executes the actual sequencer
+  functions with register stubs for envelope timing, finite completion, STOP,
+  lease expiry, ADC-loss stop, fault rejection, restart and trace bounds. No
+  board download, gate-drive test or energized operation was performed.
+
+
+## 2026-09-14 — User-requested zero-input PI response test
+
+- Add test-only PWM_OR_BENCH_ALLOW_ZERO=1: all-LOW feedback runs PI rather
+  than entering constant-input fallback. InputInvalid=1 remains diagnostic,
+  but Updates advances and command approaches the existing .90 occupancy
+  limit (.45 per phase), with the existing .025/window slew and anti-windup.
+- PA0_C/A2 remains selected. All-HIGH policy and acquisition fault shutdown
+  remain unchanged. Both bench macros must be 0 to restore strict input-fault
+  shutdown. This is not an approved missing-current-sensor policy for welding.
+- ARM build/link and C-controller host tests passed, including prolonged zero
+  feedback, slew/bounds, saturation and recovery. No target flash performed.
+
+## 2026-09-14 — Move bench feedback to PA0_C at user request
+
+- Select ADC1 regular rank 1 channel 0 in the runtime USER CODE override,
+  moving OR feedback from PA1_C/A3 to PA0_C/A2. ADC2 already selects channel
+  0 and now supplies duplicate samples of the same pin, not a second sensor.
+- Preserve open PA0 analogue switch, waveform, sampling, PID and diagnostic
+  hold policy. Generated ADC1 init/.ioc still selects channel 1; regeneration
+  must retain CurrentSense_Init's channel-0 override.
+- ARM incremental build/link passed; target wiring and response on A2 remain
+  to be checked. Prior A3 screenshot showed valid input and 7070 PID updates
+  with measured occupancy about .47168; it does not validate the new A2 wiring.
+
+## 2026-09-14 — Correct OR feedback to confirmed PA1_C wiring
+
+- User explicitly confirmed PA1_C (Arduino A3), rather than literal PA0 or
+  PA1. Change the runtime ADC1 rank-1 selection from channel 16 to channel 1.
+  Existing MSP leaves the PA1 analogue switch OPEN; preserve Ethernet on PA1.
+- PWM waveform, sample timing, PID parameters, debug freeze and test-only
+  invalid-input hold remain unchanged. This USER CODE override survives
+  regeneration and matches the generated ADC1 channel-1 selection.
+- ARM incremental compile/link and eight existing host tests passed. Actual
+  input levels and closed-loop response on this corrected channel await target
+  retest; the agent did not flash the board.
+
+
+## 2026-09-14 — Freeze the synchronized timers during debugger halt
+
+- User reports PAUSE then RUN removes PWM. The shown pre-resume snapshot has
+  zero acquisition errors, 30786 blocks, inputInvalid=1 and no PID updates.
+  It establishes constant-below-threshold feedback, not the post-resume fault.
+- TIM3/TIM4 previously continued during CPU halt, allowing DMA to overwrite
+  unprocessed halves. Set both DBGMCU APB1LFZ1 freeze bits before startup so
+  debugger halt stops the PWM and sample trigger clocks together. Keep fault
+  checks and their reset-required latch; do not auto-clear faults on resume.
+- This is for disconnected-power-stage debugging. Timer freeze retains the
+  instantaneous pin level, possibly HIGH, and an in-flight ADC/DMA transaction
+  can still finish. It is not a safe power-output pause. Normal run timing is
+  unchanged; arbitrary breakpoints inside acquisition code still need target
+  validation. No claim that every halt/resume edge case has been eliminated.
+
+
+## 2026-09-14 — Temporary bench waveform hold for invalid OR input
+
+- User's snapshot shows SD/ADC/DMA/acquisition errors zero, fault detail zero,
+  and 32 published DMA halves. This matches the first 1024-sample PID window
+  and strongly suggests the constant-input stop; g_pwmOrFault was not shown,
+  so neither this cause nor a physical wiring fault is target-confirmed.
+- For disconnected-power-stage testing only, PWM_OR_BENCH_HOLD_ON_INVALID=1
+  now replaces constant-input shutdown with fixed 25% OR occupancy (12.5%
+  per pin). PID integration is reset/frozen on invalid input. Valid mixed
+  HIGH/LOW input resumes PID. This is a temporary diagnostic fallback, not a
+  correction of the analogue feedback or a production protection policy.
+- g_pwmOrInputInvalid reports 1=all LOW, 2=all HIGH, 0=mixed or not yet assessed;
+  g_pwmOrInvalidWindows counts such windows. Set the macro to 0 to retain
+  strict fault=2 shutdown. ADC/DMA/order/deadline and preload faults still stop
+  PWM in both modes. Pins, sample timing and threshold are unchanged.
+- ARM build/link and eight host tests passed, including executing the C
+  controller in both modes and prolonged-invalid/recovery cases. Board retest
+  remains required; the agent did not flash or energize hardware.
+
+
+## 2026-09-14 — Diagnose missing bench PWM before altering stop conditions
+
+- User reports no PWM following the OR/PID build. Cause is not yet established.
+  Constant input stops the outputs after about 4 ms; acquisition/preload-window
+  faults and initialization errors can also stop or prevent startup.
+- Preserve first-stop TIM4/TIM3 registers, DMA remaining count, input range,
+  accumulated HIGH/total samples and existing fault codes in g_pwmStopDetail.
+  g_pwmStartupStage distinguishes acquisition init from successful PWM start;
+  g_pwmErrorCaller preserves Error_Handler's caller for ELF address resolution.
+- Diagnostic only: no threshold, PWM waveform, sample timing or shutdown
+  condition is bypassed. Target fault values are required before selecting a fix.
+
+
+## 2026-09-14 — PA0 diode-OR bench feedback and equal A/B pulse widths
+
+- User clarified that A/B are diode-ORed PWM signals and requested PID testing,
+  not current regulation. Supersedes the Sep 8 same-CCR inversion: use TIM4
+  center-aligned PWM1/PWM2 with CCR2=w and CCR4=ARR-w, keeping PB7/PD15 HIGH
+  polarity and full-period 65536 ticks. Both widths shrink together; centers
+  remain T/2 apart. Initial occupancy is 25%, target 50%, limits 10..90%.
+- Count ADC1 samples >=20000 codes on literal PA0 / ADC1_INP16. Retain dual
+  packed DMA and ADC2 diagnostics. Restore external TIM3 triggering, circular
+  DMA and simultaneous dual mode explicitly in CurrentSense_Init: generated
+  MX_ADC initialization in the working tree had reverted to software-triggered
+  independent mode. ADC12 uses DIV2 and 32.5-cycle acquisition.
+- Update PID every 1024 samples (16 full periods, ~3.813 ms). Kp=.20,
+  Ki=15/s, Kd=0 by default due to quantized occupancy; derivative-on-measurement
+  is implemented. Conditional anti-windup and a 2.5 percentage-point/update
+  command slew limit are applied. Gains/threshold/target are compile-time bench
+  settings, not calibrated or tuned current-loop values.
+- Each CCR is staged after its own pulse center and loads at the opposite
+  timer extremum, when that pin is LOW. This avoids splitting a pulse at its
+  center. A/B adopt changed commands in successive half periods. A direction/
+  count check rejects missed preload windows (fault-detail reason 6).
+  Never force a running update event or alter the TIM3 sample divider.
+- Constant LOW/HIGH over a control window latches a test fault; acquisition
+  faults and Error_Handler stop timers and drive PB7/PD15 LOW via GPIO.
+  Reset is required to restart. There is no hardware watchdog/interlock for
+  silent loss of all interrupts, and these changes are not power-stage safety.
+- All firmware edits are in USER CODE regions. weld3.ioc still describes the
+  old up-counter, TIM5 PA0 output, and generated ADC setup. Regeneration must
+  preserve these runtime overrides; do not enable TIM5 on PA0. The original
+  CURRENT_CONTROL_ENABLE compile-time prohibition remains for welding control.
+- Expected scope waveforms and bench wiring are in HARDWARE.md. No flashing,
+  energized power-stage operation, or target waveform validation was performed.
+
+
+## 2026-09-08 — TIM4 PWM B inverse phase
+
+- TIM4 CH2/PB7 is PWM A and TIM4 CH4/PD15 is PWM B. Both use the same compare
+  value; CH4 is configured as `PWM2` in the preserved `USER CODE` block so B is
+  the inverse of A at the 50% test duty.
+- TIM4 is not an advanced timer and inserts no dead time. This change is for
+  phase verification only; keep the power stage disconnected until polarity,
+  driver behavior and required dead time are confirmed on the oscilloscope.
+
 ## 2026-09-01 — Raw LCD capture over TCP
 
 - `CAPTURE SCREEN` snapshots the currently displayed 480 x 272 RGB888 buffer
@@ -276,3 +525,13 @@ root cause and final recovery policy remain unverified.
   DMA routing, ADC timing, or power-output behavior.
 - This remains a regeneration-risk indicator: the `.ioc` and the preserved
   runtime ADC/DMA configuration are not yet fully synchronized.
+
+## 2026-09-23 — WinApp connection references across async waits
+
+- Commands capture the writer/stream before waiting for the command lock and
+  reject a disconnected or replaced connection after acquiring it. A queued
+  command must not silently migrate to a new connection.
+- Line and exact-length reads retain a local stream reference across awaits.
+  Disposing the connection can still produce an ordinary transport exception,
+  but clearing the shared field cannot cause a null dereference in these reads.
+- Apply the same post-lock writer identity check to the profile dump.

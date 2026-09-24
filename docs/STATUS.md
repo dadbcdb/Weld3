@@ -1,8 +1,202 @@
 # Project Status
 
-Last updated: 2026-09-03
+## Stage ADC target entry
+
+WinApp stage column now accepts ADC targets 0..65535; PID directly tracks those
+values including UP/DOWN envelopes. Separate normalized target box removed.
+Existing file/profile numbers are preserved and interpreted as ADC codes.
+New app checks firmware target_mode before test output; matching firmware is
+required. Legacy stored field names remain; onboard LCD units are not migrated.
+ARM firmware and WinApp Release builds passed; all 12 host tests passed,
+including direct 10000/20000 target response and 65535/65536 boundary checks.
+No device flash or live output test was performed.
+
+## 2026-09-24 — PA1_C Rogowski and automatic graph scale
+
+ADC2 now uses PA1_C/A3/channel 1; ADC1 stays PA0_C/A2/channel 0.
+ADC plot Y axes automatically fit each channel's raw and filtered peaks.
+Earlier shared-input notes below are historical. Physical wiring is unverified.
+
+## ADC graph window
+
+Supersedes numeric-only window: two ADC/time plots overlay raw half-block means
+and filtered values in ADC-code units. Completed TEST TRACE data supplies plots,
+including when opening the window after a test. Trace rows append primary filter
+millionths, secondary mean and secondary filter millionths (9 fields total).
+Legacy 6-field rows show primary raw only. CSV headers match either format.
+Existing adaptive 1..5-ms trace interval and 2048-point limit remain; these are
+sampled snapshots, not every DMA block. Primary filter is meaningful during PID.
+
+## ADC measurement window
+
+WinApp ADC button opens a separate owned numeric window for primary/secondary
+raw and filtered values, all in ADC-code units. Polling is approximately 250ms,
+not waveform capture. Primary PID filter updates only during PID execution.
+Status telemetry adds primary filtered millionths and primary raw idle readout.
+Shared PA0_C mapping and uncalibrated units are explicitly labeled.
+
+## 2026-09-24 — WinApp secondary input display
+
+Live status and test status include secondary_adc and secondary_filtered_micro
+(normalized filter value scaled by 1,000,000; integer serialization).
+WinApp displays both below the current readout and labels the uncalibrated,
+shared PA0_C bench mapping. This is a live numeric display, not trace capture.
+ARM/Release builds and 12 host tests passed. No target flash performed.
+
+## 2026-09-24 — Secondary feedback filter
+
+ADC2 block means now feed an independent 1-ms low-pass filter continuously.
+Watch g_secondaryCurrentFiltered (0..1); g_secondaryCurrentAdc remains raw.
+Both ADCs still sample PA0_C in this bench build. Actual Rogowski mapping,
+integration/current calibration and secondary compensation remain unimplemented.
+ARM incremental build/link and 12 host tests passed, including secondary filter
+initialization, step response, alternating input and reset. No board flash or
+updated target processing-time measurement was performed.
+
+## 2026-09-24 — PID feedback filtering
+
+Added a 1-ms time-constant first-order filter to normalized ADC feedback only.
+Debugger: g_wavePidFiltered (0..1). ADC logs remain raw; no output ramp added.
+State is seeded per run; coefficient follows the configured sample rate.
+Hardware filter response and loop stability have not been verified.
+ARM incremental build/link and all 12 host tests passed, including filter step
+response, alternating-input attenuation, run-state reset and zero-target output.
+Firmware was not downloaded to the board.
+
+## WinApp grid edit transaction fix
+
+- Active text editors retain Delete/Backspace and clipboard key handling.
+- Bulk clear/paste commits cell and row edits before mutation/Refresh; invalid
+  edits leave data untouched and show a correction message. START also checks
+  commit success before reading settings.
+- Release build passed with zero warnings/errors; live editor retest pending.
+
+## WinApp source formatting
+
+C# blocks/statements and XAML elements/attributes were expanded for readability.
+Added local .editorconfig to prevent single-line C# blocks/statements.
+No behavior change intended. Release build passed with zero warnings/errors.
+
+## 2026-09-23 PID bench update
+
+PID parameters now drive the finite waveform test using ADC1 mean/65535.
+Uncheck PWM single-shot (PID OFF), check PID use, then START. Parameters are
+sent and read back before output. Both unchecked retains timing-only START.
+Feedback is uncalibrated and differs from the older thresholded OR occupancy.
+Duty cap, reset, zero-envelope and all existing stop paths apply.
+The extra output slew limit was removed at user request: a step can reach the
+duty cap on its first control update. UP/DOWN shape the target only.
+Target execution and loop tuning remain unverified.
+
+Validation: ARM incremental build/link and WinApp Release build passed.
+All 12 host tests passed, including added PID output cap, high-feedback
+reduction, STOP, restart state reset and active-run configuration rejection.
+No firmware download or live power-output operation was performed.
+
+Last updated: 2026-09-15
+
+## Current implementation: WinApp PWM single-shot test
+
+- WinApp now has an explicit PWM single-shot checkbox (PID OFF), per-phase
+  duty cap (default 5%, range 1..45%), STOP, a duty-result tab and CSV export.
+  It transfers current UI settings before starting. Current setpoints define
+  relative heights; no real-current calibration is claimed.
+- Firmware boots LOW and runs a finite SQ/UP/HOLD/DOWN/COOL profile only on
+  TEST START. Completion/STOP, detected disconnect, expired 1-second status
+  lease, ADC processing loss and acquisition faults force pins LOW. Timers/
+  acquisition continue internally when normally idle. Existing START remains
+  dry-run. Legacy continuous OR PI is disabled by PWM_WAVE_TEST_ENABLE=1.
+- Results retain up to 2048 time/target/duty/raw-ADC records. CSV is from the
+  device trace, not sparse WinApp polling. Logged duty is the commanded value,
+  not oscilloscope feedback. Long-profile traces are decimated (up to 5 ms).
+- Verification: ARM incremental build/link; WinApp .NET Release build; 12
+  host tests; offscreen WPF simulation through START, completion, graph and
+  CSV-button activation with rendered layout inspection. Production GPIO/
+  gate injection and real-time workload still require board validation.
+- Local TCP mock integration also passed: current UI settings transfer,
+  explicit test command, retrieval of a cycle completed before the next poll,
+  and control unlock after complete trace reception. See WAVEFORM_TEST.md.
+- WinApp now exposes PID 사용, Kp, Ki, Kd, 목표 and PID 적용 controls. Firmware
+  supports GET PID/SET PID with bounded values and rejects changes during a test.
+  PID remains disabled by default and is not connected to calibrated current
+  control yet; this prevents raw ADC codes from being treated as amperes.
+- Deliverable app: WinApp/WeldApp/PWM_SingleShot/WeldApp.exe. Firmware:
+  Firmware/weld3/Debug/weld3.elf. Agent has not flashed or operated the board.
+- Important: debugger PAUSE can hold an output HIGH. No energized pause or
+  single-stepping; this software is not a replacement for hardware protection.
+
+
+## Latest bench test implementation — supersedes old PWM/ADC entries below
+
+- Latest requested test: all-LOW feedback now runs PI toward the 90% OR
+  command limit (45% per phase), selected by PWM_OR_BENCH_ALLOW_ZERO=1.
+  InputInvalid=1 still indicates all LOW; it no longer implies frozen PID.
+  Input stays PA0_C/A2. ARM build and controller host tests passed; target
+  test pending. All-HIGH hold and acquisition-fault stops remain active.
+
+- Current input: PA0_C / Arduino A2, changed from A3 at user request. ADC1
+  channel 0 drives PID; ADC2 channel 0 is duplicate diagnostic acquisition.
+  ARM incremental compile/link passed. No board flash performed; A2 retest
+  pending. Prior A3 snapshot showed valid feedback, 7070 PID updates and
+  measured occupancy .47168, with no acquisition errors.
+
+- Latest correction: user confirmed OR signal is connected to PA1_C / Arduino
+  A3. Runtime ADC1 feedback now selects channel 1 instead of PA0/channel 16.
+  ARM incremental build and eight host tests pass. After flashing/resetting,
+  check inputInvalid=0, increasing pwmOrUpdates and measured occupancy near
+  0.5. Target verification is pending; all older PA0 feedback entries below
+  describe the superseded configuration.
+
+- PAUSE/RUN investigation: added joint TIM3/TIM4 debug freeze before startup,
+  preventing continuous ADC trigger/PWM progression while the CPU is halted.
+  Normal waveform/sample timing and fault checks are unchanged. User snapshot
+  shows inputInvalid=1, measured=0, updates=0: fixed test PWM only, not PID.
+  ARM incremental build and host tests pass; target pause/resume retest pending.
+
+
+- Latest diagnostic build: snapshot with 32 blocks and no ADC/DMA fault suggests
+  first-window constant-input shutdown, not a failed ADC start. For TEST ONLY,
+  PWM_OR_BENCH_HOLD_ON_INVALID=1 keeps fixed 12.5% A/B pulses while feedback
+  is invalid and resets/freezes PID. Mixed input resumes PID. Strict shutdown
+  is restored with macro=0; all acquisition fault stops remain enabled.
+  Watch g_pwmOrInputInvalid (1=all LOW, 2=all HIGH, 0=mixed/unassessed) and
+  g_pwmOrInvalidWindows. ARM link and eight host tests passed, testing both
+  fallback and strict modes. Actual PA0 levels/wiring and board output remain
+  unverified; this fallback does not repair a missing feedback signal.
+
+- Follow-up: user reports PWM absent. Not yet resolved on target. Added
+  g_pwmStopDetail (first-stop register/input snapshot), g_pwmStartupStage
+  (0=before acquisition init, 1=initializing, 2=armed, 3=PWM started), and
+  g_pwmErrorCaller (resolve against this build's ELF). ARM incremental build
+  and the existing eight host tests pass with diagnostics. Await target fault
+  values; stop conditions remain active and no board was flashed by the agent.
+
+- PA0 / Arduino D3 / ADC1_INP16 now measures diode-OR PWM occupancy. A/B retain
+  PB7/PD15 pins and HIGH polarity but use equal center-aligned pulse widths,
+  with centers T/2 apart. Initial 12.5% per phase, target 25% per phase (50% OR).
+- Restored synchronized ADC dual circular DMA configuration after generated
+  initialization had reverted. Sample rate remains nominal 268.555 kS/s,
+  64 pairs per PWM period. ADC clock DIV2 and sample time 32.5 cycles.
+- Bench PID runs every 16 periods with output limits, conditional anti-windup,
+  slew limiting, stuck-level detection and LOW pin stop on detected faults.
+  Default Kd=0; this is a PI starting configuration, not tuned welding control.
+- Observe g_pwmOrMeasured, g_pwmOrCommand (0..1 OR occupancy), g_pwmOrUpdates,
+  g_pwmOrFault (0=none, 1=acquisition, 2=constant input), g_currentSenseFault
+  and g_currentFaultDetail. Goal/threshold/gains are PWM_OR_* defines in main.c.
+- ARM incremental compile/link passed. Six acquisition contract tests and two
+  new bench tests passed, including executing the actual extracted C PID on
+  the host for quantized-loop convergence, bounds, slew, saturation and stuck
+  inputs. These do not validate HAL behavior, trigger phase or electrical I/O.
+- Board not flashed. Scope validation, ADC threshold verification, actual
+  interrupt deadlines and waveform shape remain pending. Read HARDWARE.md
+  before wiring; supplied 100-ohm pull-down is a substantial GPIO load.
+
 
 ## Implemented
+
+- TIM4 PWM B (PD15/CH4) is configured in PWM2 mode to be inverse phase to PWM A
+  (PB7/CH2) at the shared 50% test duty. No hardware dead time is provided;
+  bench polarity/dead-time verification remains required.
 
 - Screen1 용접 파형 그래프의 X축 그리드는 TouchGFX Designer 설정으로 관리한다.
   `.touchgfx`에서 81개 점(80개 구간), 주요선/라벨 10 샘플, 보조선 5 샘플로
@@ -174,3 +368,15 @@ Last updated: 2026-09-03
 4. Add SD startup delay/retry or make SD failure nonfatal according to product
    requirements.
 5. Build and archive a clean compiler result before power-stage testing.
+
+## 2026-09-23 — WinApp Command NullReferenceException fix
+
+- Diagnosed a race in MainWindow.Command: Disconnect can clear writer while
+  Command awaits commandLock, after its original null check.
+- Added post-lock connection identity validation and stable stream references.
+- Validation: .NET 10 build passed with 0 warnings and 0 errors (output:
+  WinApp/WeldApp/WeldApp/bin_test/NullConnectionFix).
+- A temporary console harness using the actual Command/read method source
+  passed queued-disconnect, queued-connection-replacement, normal PING/PONG,
+  and semaphore-release checks using loopback TCP only.
+- No device or power-stage operation performed; real-device UI retest pending.

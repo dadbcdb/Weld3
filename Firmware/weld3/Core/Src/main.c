@@ -27,6 +27,8 @@
 /* USER CODE BEGIN Includes */
 //#include "stm32h735g_discovery_ospi.h"
 #include "MainProc.h"
+#include "WaveTest.h"
+#include "CurrentFeedbackFilter.h"
 #include "stm32h7xx_hal_ospi.h"
 /* USER CODE END Includes */
 
@@ -38,9 +40,22 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define PWM_A_CHANNEL          TIM_CHANNEL_2
+#define PWM_WAVE_TEST_ENABLE   1U /* Explicit single-shot mode; no boot PWM. */
 #define PWM_B_CHANNEL          TIM_CHANNEL_4
 #define ADC_TRIGGER_CHANNEL    TIM_CHANNEL_3
-#define PWM_DUTY_PERCENT       50U
+#define PWM_PERIOD_TICKS       65536U
+#define PWM_TEST_INITIAL_CCR   4096U
+#define PWM_OR_THRESHOLD       20000U
+#define PWM_OR_TARGET          0.50f
+#define PWM_OR_KP              0.20f
+#define PWM_OR_KI              15.0f
+#define PWM_OR_KD              0.0f /* Quantized feedback: start with PI. */
+#ifndef PWM_OR_BENCH_ALLOW_ZERO
+#define PWM_OR_BENCH_ALLOW_ZERO 1U /* TEST ONLY: zero feedback drives duty upward. */
+#endif
+#ifndef PWM_OR_BENCH_HOLD_ON_INVALID
+#define PWM_OR_BENCH_HOLD_ON_INVALID 1U /* TEST ONLY: power stage disconnected. */
+#endif
 #define CURRENT_DMA_SAMPLES    64U
 #define CURRENT_DMA_HALF       (CURRENT_DMA_SAMPLES / 2U)
 #define CURRENT_CONTROL_ENABLE 0U
@@ -111,6 +126,9 @@ DMA_HandleTypeDef hdma_adc1;
 volatile uint32_t g_adc1Value;
 volatile uint16_t g_primaryCurrentAdc;
 volatile uint16_t g_secondaryCurrentAdc;
+/* ADC2 path reserved for conditioned Rogowski feedback; normalized, not A. */
+volatile float g_secondaryCurrentFiltered;
+static CurrentFeedbackFilter secondaryFeedbackFilter;
 volatile uint16_t g_primaryCurrentMin;
 volatile uint16_t g_primaryCurrentMax;
 volatile uint16_t g_secondaryCurrentMin;
@@ -156,14 +174,50 @@ volatile uint32_t g_currentWarmupBlocks = 2U; /* Discard startup/preload period.
 typedef struct
 {
   uint32_t reason; /* 1=order, 2=entry ownership, 3=exit ownership,
-                      4=processing deadline, 5=publication deadline */
+                      4=processing deadline, 5=publication deadline,
+                      6=PWM preload window missed */
   uint32_t offset, expectedOffset, ndtrEntry, ndtrExit;
   uint32_t elapsedCycles, budgetCycles, warmupBlocks, publishedBlocks;
   uint32_t dmaFlags, pwmCount;
 } CurrentFaultDetail;
 volatile CurrentFaultDetail g_currentFaultDetail;
 static uint32_t currentExpectedOffset;
+/* Bench-only OR occupancy feedback, NOT calibrated welding current. */
+volatile float g_pwmOrMeasured;
+volatile float g_pwmOrCommand = 0.25f;
+volatile uint32_t g_pwmOrUpdates;
+volatile uint32_t g_pwmOrFault; /* 1=acquisition, 2=no HIGH/LOW in 16 periods */
+volatile uint32_t g_pwmOrInputInvalid; /* 0=mixed/unassessed, 1=all LOW, 2=all HIGH */
+volatile uint32_t g_pwmOrInvalidWindows;
+/* First-stop evidence survives PwmOr_Stop changing timer/GPIO registers. */
+volatile uint32_t g_pwmStartupStage; /* 0=before acquisition, 1=init, 2=armed, 3=started */
+volatile uintptr_t g_pwmErrorCaller; /* Error_Handler return address; resolve with ELF */
+typedef struct
+{
+  uint32_t valid, startupStage, fault, acquisitionFault, detailReason;
+  uint32_t cr1, ccer, ccmr1, ccmr2, cnt, arr, ccr2, ccr4;
+  uint32_t tim3Cr1, tim3Cnt, ndtr, adc1Error, adc2Error;
+  uint32_t inputMin, inputMax, highSamples, totalSamples;
+} PwmStopDetail;
+volatile PwmStopDetail g_pwmStopDetail;
+static uint32_t pwmOrHigh, pwmOrSamples;
+static float pwmOrIntegral = 0.25f, pwmOrPrevious;
 __attribute__((aligned(32))) static uint32_t g_currentDmaBuffer[CURRENT_DMA_SAMPLES];
+static WeldSettings waveSettings;
+static WaveTestStatus waveStatus;
+static WaveTestSample waveSamples[2048];
+static float wavePeak;
+static uint32_t waveLimit, waveRunPairs, waveLeaseTick, waveDmaTick;
+static uint32_t waveInterval, waveNextLog, waveArmHalves;
+static WavePidConfig wavePid = {0.20f, 15.0f, 0.0f, 0.50f, 0U};
+static float waveIntegral, wavePrevious, waveOutput;
+/* Feedback-only low-pass: tau=1 ms, nominal coefficient about 0.1065.
+ * State is seeded from the current ADC mean at every single-shot start. */
+static const float waveFilterTauSeconds = 0.001f;
+static float waveFilterAlpha;
+volatile float g_wavePidFiltered;
+static void WaveTest_Tick(void);
+static void WaveTest_Dma(void);
 
 osThreadId_t TouchGFXTaskHandle;
 const osThreadAttr_t TouchGFXTask_attributes = {
@@ -295,29 +349,20 @@ int main(void)
   /* Call PreOsInit function */
   MX_TouchGFX_PreOSInit();
   /* USER CODE BEGIN 2 */
+  g_pwmStartupStage = 1U;
   CurrentSense_Init();
+  g_pwmStartupStage = 2U;
 
-  /* PWM A phase: PB7 (Arduino D9 / TIM4_CH2, PWM1). */
-  __HAL_TIM_SET_COMPARE(&htim4, PWM_A_CHANNEL,
-                        ((htim4.Init.Period + 1U) * PWM_DUTY_PERCENT) / 100U);
-
-  /* PWM B phase: PD15 (Arduino D6 / TIM4_CH4, PWM2), complementary to A. */
-  __HAL_TIM_SET_COMPARE(&htim4, PWM_B_CHANNEL,
-                        __HAL_TIM_GET_COMPARE(&htim4, PWM_A_CHANNEL));
-
-  /* Legacy internal CH3 compare retained; ADC now uses TIM3 OC4REF. */
-  __HAL_TIM_SET_COMPARE(&htim4, ADC_TRIGGER_CHANNEL,
-                        __HAL_TIM_GET_COMPARE(&htim4, PWM_A_CHANNEL) / 2U);
-
-  if (HAL_TIM_PWM_Start(&htim4, PWM_A_CHANNEL) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  if (HAL_TIM_PWM_Start(&htim4, PWM_B_CHANNEL) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  /* A is centered at CNT=0, B at CNT=ARR. Single-shot mode loads OFF
+     compares before enabling pins; the legacy OR test starts at 12.5% each. */
+  TIM4->CCR2 = PWM_WAVE_TEST_ENABLE ? 0U : PWM_TEST_INITIAL_CCR;
+  TIM4->CCR4 = PWM_WAVE_TEST_ENABLE ? TIM4->ARR + 1U : TIM4->ARR - PWM_TEST_INITIAL_CCR;
+  if (PWM_WAVE_TEST_ENABLE) g_pwmOrCommand = 0.0f;
+  TIM4->EGR = TIM_EGR_UG;
+  TIM4->SR = 0U;
+  SET_BIT(TIM4->CCER, TIM_CCER_CC2E | TIM_CCER_CC4E);
+  SET_BIT(TIM4->CR1, TIM_CR1_CEN); /* Also starts the waiting TIM3. */
+  g_pwmStartupStage = 3U;
 
   /* PG3 is now owned exclusively by DMA processing, not TIM4 interrupts. */
 
@@ -1354,6 +1399,17 @@ static void MX_TIM4_Init(void)
   }
   /* USER CODE BEGIN TIM4_Init 2 */
 
+  /* Bench-only center-aligned PWM: full period = 2*32768 timer ticks.
+     PWM1 at zero and PWM2 at ARR give equal pulses T/2 apart. */
+  htim4.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
+  htim4.Init.Period = PWM_PERIOD_TICKS / 2U;
+  if (HAL_TIM_PWM_Init(&htim4) != HAL_OK) Error_Handler();
+  sConfigOC.OCMode = TIM_OCMODE_PWM2;
+  if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   /* USER CODE END TIM4_Init 2 */
   HAL_TIM_MspPostInit(&htim4);
 
@@ -1830,6 +1886,99 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
   }
 }
 
+static void PwmOr_Stop(void)
+{
+  GPIO_InitTypeDef gpio = {0};
+  if (g_pwmStopDetail.valid == 0U)
+  {
+    g_pwmStopDetail.startupStage = g_pwmStartupStage;
+    g_pwmStopDetail.fault = g_pwmOrFault;
+    g_pwmStopDetail.acquisitionFault = g_currentSenseFault;
+    g_pwmStopDetail.detailReason = g_currentFaultDetail.reason;
+    g_pwmStopDetail.cr1 = TIM4->CR1;
+    g_pwmStopDetail.ccer = TIM4->CCER;
+    g_pwmStopDetail.ccmr1 = TIM4->CCMR1;
+    g_pwmStopDetail.ccmr2 = TIM4->CCMR2;
+    g_pwmStopDetail.cnt = TIM4->CNT;
+    g_pwmStopDetail.arr = TIM4->ARR;
+    g_pwmStopDetail.ccr2 = TIM4->CCR2;
+    g_pwmStopDetail.ccr4 = TIM4->CCR4;
+    g_pwmStopDetail.tim3Cr1 = TIM3->CR1;
+    g_pwmStopDetail.tim3Cnt = TIM3->CNT;
+    g_pwmStopDetail.ndtr = DMA1_Stream0->NDTR;
+    g_pwmStopDetail.adc1Error = hadc1.ErrorCode;
+    g_pwmStopDetail.adc2Error = hadc2.ErrorCode;
+    g_pwmStopDetail.inputMin = g_primaryCurrentMin;
+    g_pwmStopDetail.inputMax = g_primaryCurrentMax;
+    g_pwmStopDetail.highSamples = pwmOrHigh;
+    g_pwmStopDetail.totalSamples = pwmOrSamples;
+    __DMB();
+    g_pwmStopDetail.valid = 1U;
+  }
+  WaveTest_Stop(4U);
+  CLEAR_BIT(TIM4->CCER, TIM_CCER_CC2E | TIM_CCER_CC4E);
+  CLEAR_BIT(TIM4->CR1, TIM_CR1_CEN);
+  CLEAR_BIT(TIM3->CR1, TIM_CR1_CEN);
+  /* Disabled timer channels alone do not guarantee pin LOW. */
+  GPIOB->BSRR = (uint32_t)GPIO_PIN_7 << 16U;
+  GPIOD->BSRR = (uint32_t)GPIO_PIN_15 << 16U;
+  gpio.Mode = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull = GPIO_NOPULL;
+  gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  gpio.Pin = GPIO_PIN_7;
+  HAL_GPIO_Init(GPIOB, &gpio);
+  gpio.Pin = GPIO_PIN_15;
+  HAL_GPIO_Init(GPIOD, &gpio);
+}
+
+static void PwmOr_Process(uint32_t high, uint32_t count)
+{
+  pwmOrHigh += high;
+  pwmOrSamples += count;
+  if (pwmOrSamples < 16U * CURRENT_DMA_SAMPLES) return;
+  g_pwmOrMeasured = (float)pwmOrHigh / (float)pwmOrSamples;
+  g_pwmOrInputInvalid = (pwmOrHigh == 0U) ? 1U :
+                       ((pwmOrHigh == pwmOrSamples) ? 2U : 0U);
+  if (g_pwmOrInputInvalid != 0U) ++g_pwmOrInvalidWindows;
+#if PWM_OR_BENCH_ALLOW_ZERO
+  /* User-requested zero-input response test. Keep LOW visible diagnostically,
+     but let PI approach its existing upper bound instead of holding PWM. */
+  if (pwmOrHigh == pwmOrSamples)
+#else
+  if ((pwmOrHigh == 0U) || (pwmOrHigh == pwmOrSamples))
+#endif
+  {
+#if PWM_OR_BENCH_HOLD_ON_INVALID
+    /* Diagnostic fallback only: provide a known waveform for probing PA0_C.
+       Never integrate missing feedback up to maximum duty. */
+    g_pwmOrCommand = 0.25f;
+    pwmOrIntegral = 0.25f;
+    pwmOrPrevious = g_pwmOrMeasured;
+    pwmOrHigh = pwmOrSamples = 0U;
+#else
+    g_pwmOrFault = 2U;
+    PwmOr_Stop();
+#endif
+    return;
+  }
+  float dt = (float)pwmOrSamples / (float)g_currentSampleRateHz;
+  float error = PWM_OR_TARGET - g_pwmOrMeasured;
+  float candidate = pwmOrIntegral + PWM_OR_KI * dt * error;
+  float output = PWM_OR_KP * error + candidate
+               - PWM_OR_KD * (g_pwmOrMeasured - pwmOrPrevious) / dt;
+  /* Conditional integration avoids windup at the occupancy limits. */
+  if (!((output > 0.90f && error > 0.0f) ||
+        (output < 0.10f && error < 0.0f))) pwmOrIntegral = candidate;
+  if (output > 0.90f) output = 0.90f;
+  if (output < 0.10f) output = 0.10f;
+  if (output > g_pwmOrCommand + 0.025f) output = g_pwmOrCommand + 0.025f;
+  if (output < g_pwmOrCommand - 0.025f) output = g_pwmOrCommand - 0.025f;
+  g_pwmOrCommand = output;
+  pwmOrPrevious = g_pwmOrMeasured;
+  ++g_pwmOrUpdates;
+  pwmOrHigh = pwmOrSamples = 0U;
+}
+
 static void CurrentSense_RecordFault(uint32_t reason, uint32_t offset,
                                      uint32_t entry, uint32_t remaining,
                                      uint32_t start)
@@ -1848,6 +1997,8 @@ static void CurrentSense_RecordFault(uint32_t reason, uint32_t offset,
   g_currentFaultDetail.pwmCount = TIM4->CNT;
   __DMB();
   g_currentSenseFault = 1U;
+  g_pwmOrFault = 1U;
+  PwmOr_Stop();
   ++g_currentDeadlineMisses;
   CLEAR_BIT(TIM3->CR1, TIM_CR1_CEN);
   ARD_D2_GPIO_Port->BSRR = (uint32_t)ARD_D2_Pin << 16U;
@@ -1860,12 +2011,13 @@ static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count)
   uint16_t primaryMin = UINT16_MAX, secondaryMin = UINT16_MAX;
   uint16_t primaryMax = 0U, secondaryMax = 0U;
   uint32_t i;
+  uint32_t high = 0U;
 
   uint32_t start = DWT->CYCCNT;
   uint32_t remaining = __HAL_DMA_GET_COUNTER(&hdma_adc1);
   uint32_t entryRemaining = remaining;
   uint32_t half = offset / CURRENT_DMA_HALF;
-  if (g_currentSenseFault != 0U) return;
+  if ((g_currentSenseFault != 0U) || (g_pwmOrFault != 0U)) return;
   ARD_D2_GPIO_Port->BSRR = ARD_D2_Pin;
   g_currentPwmCountAtCallback = TIM4->CNT;
   /* Never process the half currently being written. Catch delayed/coalesced IRQs. */
@@ -1885,6 +2037,7 @@ static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count)
     uint16_t primary = (uint16_t)(g_currentDmaBuffer[i] & 0xffffU);
     uint16_t secondary = (uint16_t)(g_currentDmaBuffer[i] >> 16);
     primarySum += primary;
+    if (primary >= PWM_OR_THRESHOLD) ++high;
     secondarySum += secondary;
     if (primary < primaryMin) primaryMin = primary;
     if (primary > primaryMax) primaryMax = primary;
@@ -1910,6 +2063,8 @@ static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count)
   }
   g_primaryCurrentAdc = (uint16_t)(primarySum / count);
   g_secondaryCurrentAdc = (uint16_t)(secondarySum / count);
+  g_secondaryCurrentFiltered = CurrentFeedbackFilter_Update(
+      &secondaryFeedbackFilter, g_secondaryCurrentAdc);
   g_primaryCurrentMin = primaryMin;
   g_primaryCurrentMax = primaryMax;
   g_secondaryCurrentMin = secondaryMin;
@@ -1926,6 +2081,32 @@ static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count)
   __DMB();
   ++g_currentHalf[half].sequence;
   ++g_currentDmaBlocks;
+#if PWM_WAVE_TEST_ENABLE
+  (void)high;
+  WaveTest_Dma();
+#else
+  PwmOr_Process(high, count);
+#endif
+  if (g_pwmOrFault == 0U)
+  {
+    uint32_t direction = TIM4->CR1 & TIM_CR1_DIR;
+    uint32_t position = TIM4->CNT;
+    if (((half == 0U) && ((direction == 0U) || (position < 2048U))) ||
+        ((half != 0U) && ((direction != 0U) || (position > TIM4->ARR - 2048U))))
+    {
+      CurrentSense_RecordFault(6U, offset, entryRemaining,
+                              __HAL_DMA_GET_COUNTER(&hdma_adc1), start);
+      return;
+    }
+    uint32_t width = (uint32_t)(g_pwmOrCommand *
+                               (float)(PWM_PERIOD_TICKS / 4U));
+    /* Stage each compare just after its pulse center; it loads at the
+       opposite extremum, while that output is LOW. This avoids changing
+       width halfway through a pulse. A/B adopt a new command in successive
+       half-periods. Never force UG while sampling. */
+    if (half == 0U) TIM4->CCR4 = width ? TIM4->ARR - width : TIM4->ARR + 1U;
+    else TIM4->CCR2 = width;
+  }
   g_currentProcessingCycles = DWT->CYCCNT - start;
   if (g_currentProcessingCycles > g_currentMaxProcessingCycles)
     g_currentMaxProcessingCycles = g_currentProcessingCycles;
@@ -1944,10 +2125,12 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
     g_currentAdcError = HAL_ADC_GetError(hadc);
     g_currentDmaError = HAL_DMA_GetError(&hdma_adc1);
     g_currentSenseFault = 2U;
+    g_pwmOrFault = 1U;
+    PwmOr_Stop();
     CLEAR_BIT(TIM3->CR1, TIM_CR1_CEN);
     ARD_D2_GPIO_Port->BSRR = (uint32_t)ARD_D2_Pin << 16U;
   }
-  /* Acquisition fault latch only; this is NOT a power-stage shutdown. */
+  /* Stops bench pins only; no verified power-stage interlock exists. */
 }
 
 static void CurrentSense_Init(void)
@@ -1956,12 +2139,20 @@ static void CurrentSense_Init(void)
   TIM_SlaveConfigTypeDef slave = {0};
   TIM_OC_InitTypeDef oc = {0};
   uint32_t timerClock = HAL_RCC_GetPCLK1Freq();
-  uint32_t pwmTicks = htim4.Init.Period + 1U;
+  uint32_t pwmTicks = 2U * htim4.Init.Period;
   uint32_t sampleTicks = pwmTicks / CURRENT_DMA_SAMPLES;
+
+  /* Bench debugging: halt PWM and its ADC trigger together on CPU PAUSE.
+     Otherwise DMA keeps wrapping while callbacks cannot execute, and RUN
+     correctly trips the stale-buffer checks. Set both freeze bits before
+     either timer starts. This holds pin levels; it is NOT a gate shutdown. */
+  SET_BIT(DBGMCU->APB1LFZ1,
+          DBGMCU_APB1LFZ1_DBG_TIM3 | DBGMCU_APB1LFZ1_DBG_TIM4);
 
   if ((RCC->CFGR & RCC_CFGR_TIMPRE) != 0U ||
       (htim4.Init.Prescaler != 0U) || (pwmTicks != 65536U) ||
-      (PWM_DUTY_PERCENT != 50U) || ((TIM4->CR1 & TIM_CR1_CEN) != 0U))
+      (htim4.Init.CounterMode != TIM_COUNTERMODE_CENTERALIGNED1) ||
+      ((TIM4->CR1 & TIM_CR1_CEN) != 0U))
     Error_Handler();
 
   if ((RCC->D2CFGR & RCC_D2CFGR_D2PPRE1_Msk) != RCC_D2CFGR_D2PPRE1_DIV1)
@@ -1969,6 +2160,8 @@ static void CurrentSense_Init(void)
     timerClock *= 2U;
   }
   g_currentSampleRateHz = timerClock / sampleTicks;
+  CurrentFeedbackFilter_Init(&secondaryFeedbackFilter,
+      (float)CURRENT_DMA_HALF / (float)g_currentSampleRateHz, 0.001f);
   g_currentHalfBudgetCycles = (uint32_t)(((uint64_t)SystemCoreClock *
                                            (pwmTicks / 2U)) / timerClock);
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -2007,6 +2200,34 @@ static void CurrentSense_Init(void)
   if (((uintptr_t)g_currentDmaBuffer < 0x24000000UL) ||
       (((uintptr_t)g_currentDmaBuffer + sizeof(g_currentDmaBuffer)) > 0x24050000UL))
     Error_Handler();
+  /* Restore runtime acquisition settings after generated MX_ADC init.
+     Requested OR input: PA0_C / Arduino A2 / ADC1_INP0.
+     Keep the PA0 analogue switch OPEN to isolate PA0 / Arduino D3.
+     ADC2 uses PA1_C / Arduino A3 / ADC2_INP1 for conditioned Rogowski input.
+     PA1 analogue switch remains OPEN to isolate Ethernet REF_CLK on PA1. */
+  ADC_ChannelConfTypeDef channel = {0};
+  ADC_MultiModeTypeDef dual = {0};
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
+  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIG_T3_TRGO;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc1.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_CIRCULAR;
+  hadc1.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK) Error_Handler();
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
+  hadc2.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK) Error_Handler();
+  channel.Channel = ADC_CHANNEL_0;
+  channel.Rank = ADC_REGULAR_RANK_1;
+  channel.SamplingTime = ADC_SAMPLETIME_32CYCLES_5;
+  channel.SingleDiff = ADC_SINGLE_ENDED;
+  channel.OffsetNumber = ADC_OFFSET_NONE;
+  if (HAL_ADC_ConfigChannel(&hadc1, &channel) != HAL_OK) Error_Handler();
+  channel.Channel = ADC_CHANNEL_1;
+  if (HAL_ADC_ConfigChannel(&hadc2, &channel) != HAL_OK) Error_Handler();
+  dual.Mode = ADC_DUALMODE_REGSIMULT;
+  dual.DualModeData = ADC_DUALMODEDATAFORMAT_32_10_BITS;
+  dual.TwoSamplingDelay = ADC_TWOSAMPLINGDELAY_1CYCLE;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &dual) != HAL_OK) Error_Handler();
   if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET_LINEARITY, ADC_SINGLE_ENDED) != HAL_OK)
     Error_Handler();
   if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_CALIB_OFFSET_LINEARITY, ADC_SINGLE_ENDED) != HAL_OK)
@@ -2017,6 +2238,205 @@ static void CurrentSense_Init(void)
   if (HAL_ADCEx_MultiModeStart_DMA(&hadc1, g_currentDmaBuffer,
                                    CURRENT_DMA_SAMPLES) != HAL_OK) Error_Handler();
   /* Do not software-start TIM3: the later TIM4 PWM start is the only trigger. */
+}
+
+static void WaveTest_OutputsOff(void)
+{
+  CLEAR_BIT(TIM4->CCER, TIM_CCER_CC2E | TIM_CCER_CC4E);
+  GPIOB->BSRR = (uint32_t)GPIO_PIN_7 << 16U;
+  GPIOD->BSRR = (uint32_t)GPIO_PIN_15 << 16U;
+  MODIFY_REG(GPIOB->MODER, 3UL << 14U, 1UL << 14U);
+  MODIFY_REG(GPIOD->MODER, 3UL << 30U, 1UL << 30U);
+  TIM4->CCR2 = 0U;
+  TIM4->CCR4 = TIM4->ARR + 1U;
+  g_pwmOrCommand = 0.0f;
+}
+
+static void WaveTest_Log(float target)
+{
+  if (waveStatus.count >= 2048U) return;
+  WaveTestSample *p = &waveSamples[waveStatus.count];
+  p->time_ms = waveStatus.elapsed_ms;
+  p->target_milli = (uint32_t)(target * 1000.0f);
+  p->duty_permille = waveStatus.duty_permille;
+  p->adc_mean = g_primaryCurrentAdc;
+  p->adc_min = g_primaryCurrentMin;
+  p->adc_max = g_primaryCurrentMax;
+  p->primary_filtered_micro = (uint32_t)(g_wavePidFiltered * 1000000.0f + 0.5f);
+  p->secondary_adc = g_secondaryCurrentAdc;
+  p->secondary_filtered_micro = (uint32_t)(g_secondaryCurrentFiltered * 1000000.0f + 0.5f);
+  __DMB();
+  ++waveStatus.count;
+}
+
+void WaveTest_Stop(uint32_t reason)
+{
+  uint32_t mask = __get_PRIMASK();
+  __disable_irq();
+  if (PWM_WAVE_TEST_ENABLE)
+  {
+    WaveTest_OutputsOff();
+    if (waveStatus.active)
+    {
+      if (waveStatus.elapsed_ms > waveStatus.duration_ms)
+        waveStatus.elapsed_ms = waveStatus.duration_ms;
+      waveStatus.duty_permille = 0U;
+      WaveTest_Log(0.0f);
+      waveStatus.reason = reason;
+      waveStatus.active = 0U;
+    }
+  }
+  __set_PRIMASK(mask);
+}
+
+int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent)
+{
+  if (!PWM_WAVE_TEST_ENABLE || !s || duty_percent < 1U || duty_percent > 45U)
+    return 0;
+  float peak = 0.0f;
+  if (s->squeeze_ms > 999U || s->cool_ms[0] > 999U || s->cool_ms[1] > 999U) return 0;
+  for (unsigned i = 0; i < 3; ++i)
+  {
+    float v = s->stage_current_a[i];
+    if (!(v >= 0.0f && v <= 65535.0f) || s->stage_up_ms[i] > 500U ||
+        s->stage_time_ms[i] > 999U || s->stage_down_ms[i] > 500U ||
+        ((v == 0.0f) != (s->stage_time_ms[i] == 0U)) ||
+        (v == 0.0f && (s->stage_up_ms[i] || s->stage_down_ms[i]))) return 0;
+    if (v > peak) peak = v;
+  }
+  uint32_t duration = WaveTest_Duration(s);
+  if (peak == 0.0f || duration == 0U || duration > 9000U) return 0;
+  uint32_t mask = __get_PRIMASK();
+  __disable_irq();
+  if (waveStatus.active || g_currentSenseFault || g_pwmOrFault ||
+      g_currentDmaBlocks == 0U || HAL_GetTick() - waveDmaTick > 3U)
+  { __set_PRIMASK(mask); return 0; }
+  WaveTest_OutputsOff();
+  waveSettings = *s; /* Immutable for this run. No RTOS call from acquisition IRQ. */
+  wavePeak = peak;
+  waveIntegral = waveOutput = 0.0f;
+  wavePrevious = (float)g_primaryCurrentAdc / 65535.0f;
+  g_wavePidFiltered = wavePrevious;
+  float filterDt = (float)CURRENT_DMA_HALF / (float)g_currentSampleRateHz;
+  waveFilterAlpha = filterDt / (waveFilterTauSeconds + filterDt);
+  waveLimit = duty_percent;
+  waveStatus.id++;
+  waveStatus.reason = 0U;
+  waveStatus.elapsed_ms = waveStatus.count = waveStatus.duty_permille = 0U;
+  waveStatus.duration_ms = duration;
+  waveInterval = (duration + 2045U) / 2046U;
+  waveNextLog = 0U;
+  waveRunPairs = 0U;
+  waveArmHalves = 3U; /* Let both zero-compare preloads settle before AF enable. */
+  waveLeaseTick = HAL_GetTick();
+  waveStatus.active = 1U;
+  __set_PRIMASK(mask);
+  return 1;
+}
+
+void WaveTest_KeepAlive(void) { waveLeaseTick = HAL_GetTick(); }
+void WaveTest_GetStatus(WaveTestStatus *s)
+{
+  uint32_t mask = __get_PRIMASK(); __disable_irq();
+  *s = waveStatus;
+  s->adc_mean = g_primaryCurrentAdc;
+  s->primary_filtered_micro = (uint32_t)(g_wavePidFiltered * 1000000.0f + 0.5f);
+  s->secondary_adc = g_secondaryCurrentAdc;
+  s->secondary_filtered_micro = (uint32_t)(g_secondaryCurrentFiltered * 1000000.0f + 0.5f);
+  __set_PRIMASK(mask);
+}
+int WaveTest_GetSample(uint32_t id, uint32_t index, WaveTestSample *s)
+{
+  uint32_t mask = __get_PRIMASK(); __disable_irq();
+  int valid = !waveStatus.active && id == waveStatus.id && index < waveStatus.count;
+  if (valid) *s = waveSamples[index];
+  __set_PRIMASK(mask);
+  return valid;
+}
+void WaveTest_GetPid(WavePidConfig *config) { if (config) *config = wavePid; }
+int WaveTest_SetPid(const WavePidConfig *config)
+{
+  if (!config || !isfinite(config->kp) || !isfinite(config->ki) || !isfinite(config->kd) ||
+      !isfinite(config->target) || config->kp < 0.0f || config->kp > 100.0f ||
+      config->ki < 0.0f || config->ki > 1000.0f || config->kd < 0.0f || config->kd > 100.0f ||
+      config->target < 0.0f || config->target > 1.0f) return 0;
+  if (waveStatus.active) return 0;
+  wavePid = *config; return 1;
+}
+
+/* Normalized ADC bench feedback, not calibrated amperes. Output is per-phase
+ * duty fraction. Derivative acts on measurement; integration stops at limits. */
+static float WaveTest_Control(float target)
+{
+  if (!wavePid.enabled) return (float)waveLimit * target / wavePeak;
+  float raw = (float)g_primaryCurrentAdc / 65535.0f;
+  g_wavePidFiltered += waveFilterAlpha * (raw - g_wavePidFiltered);
+  float measured = g_wavePidFiltered;
+  float dt = (float)CURRENT_DMA_HALF / (float)g_currentSampleRateHz;
+  if (target <= 0.0f) {
+    waveIntegral = waveOutput = 0.0f; wavePrevious = measured; return 0.0f;
+  }
+  float error = target / 65535.0f - measured;
+  float limit = (float)waveLimit * 0.01f;
+  float integral = waveIntegral + wavePid.ki * error * dt;
+  float pd = wavePid.kp * error - wavePid.kd * (measured-wavePrevious)/dt;
+  float requested = pd + integral;
+  if ((requested >= 0.0f && requested <= limit) ||
+      (requested > limit && error < 0.0f) || (requested < 0.0f && error > 0.0f))
+    waveIntegral = integral;
+  float output = pd + waveIntegral;
+  if (output < 0.0f) output = 0.0f;
+  if (output > limit) output = limit;
+  wavePrevious = measured; waveOutput = output;
+  return output * 100.0f;
+}
+
+static void WaveTest_Dma(void)
+{
+  (void)PwmOr_Process; /* Legacy OR controller is deliberately not executed here. */
+  waveDmaTick = HAL_GetTick();
+  if (!waveStatus.active) return;
+  if (waveArmHalves)
+  {
+    if (--waveArmHalves != 0U) return;
+    /* AF2 mappings established by TIM4 MSP. Both active compares are zero-OFF. */
+    MODIFY_REG(GPIOB->MODER, 3UL << 14U, 2UL << 14U);
+    MODIFY_REG(GPIOD->MODER, 3UL << 30U, 2UL << 30U);
+    SET_BIT(TIM4->CCER, TIM_CCER_CC2E | TIM_CCER_CC4E);
+    float target = WaveTest_Target(&waveSettings, 0U);
+    float duty = WaveTest_Control(target);
+    waveStatus.duty_permille = (uint32_t)(duty * 10.0f + 0.5f);
+    g_pwmOrCommand = duty * 0.02f;
+    WaveTest_Log(target);
+    waveNextLog = waveInterval;
+    return;
+  }
+  /* Sequence duration follows acquired sample pairs at priority 4, rather
+     than the GUI/TCP task or the lower-priority HAL millisecond tick. */
+  waveRunPairs += CURRENT_DMA_HALF;
+  waveStatus.elapsed_ms = (uint32_t)(((uint64_t)waveRunPairs * 1000U) /
+                                    g_currentSampleRateHz);
+  if (waveStatus.elapsed_ms >= waveStatus.duration_ms) { WaveTest_Stop(1U); return; }
+  float target = WaveTest_Target(&waveSettings, waveStatus.elapsed_ms);
+  float duty = WaveTest_Control(target);
+  waveStatus.duty_permille = (uint32_t)(duty * 10.0f + 0.5f);
+  g_pwmOrCommand = duty * 0.02f;
+  if (waveStatus.elapsed_ms >= waveNextLog)
+  { WaveTest_Log(target); waveNextLog = waveStatus.elapsed_ms + waveInterval; }
+}
+
+static void WaveTest_Tick(void)
+{
+  if (!PWM_WAVE_TEST_ENABLE) return;
+  uint32_t mask = __get_PRIMASK(); __disable_irq();
+  if (waveStatus.active)
+  {
+    uint32_t now = HAL_GetTick();
+    if (now - waveDmaTick > 3U || g_currentSenseFault || g_pwmOrFault)
+      WaveTest_Stop(4U);
+    else if (now - waveLeaseTick > 1000U) WaveTest_Stop(3U);
+  }
+  __set_PRIMASK(mask);
 }
 
 /* USER CODE END 4 */
@@ -2109,6 +2529,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
+  if (htim->Instance == TIM23) WaveTest_Tick();
 
   /* USER CODE END Callback 1 */
 }
@@ -2122,6 +2543,9 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
+  if (g_pwmErrorCaller == 0U)
+    g_pwmErrorCaller = (uintptr_t)__builtin_return_address(0);
+  PwmOr_Stop();
   while (1)
   {
   }

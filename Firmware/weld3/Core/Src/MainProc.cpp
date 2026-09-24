@@ -10,6 +10,7 @@
 #include "MainProc.h"
 #include "main.h"
 #include "WeldData.h"
+#include "WaveTest.h"
 #include "xprintf.h"
 
 #include "FreeRTOS.h"
@@ -42,6 +43,12 @@ static void UnlockData(void);
 static uint32_t dryRunStartTick;
 static uint32_t dryRunDurationMs;
 static uint8_t dryRunActive;
+static bool WaveTest_IsActive(void)
+{
+  WaveTestStatus s;
+  WaveTest_GetStatus(&s);
+  return s.active != 0U;
+}
 
 /* MX25LM51245G: reserve the final 64 KiB of the 64 MiB OSPI NOR. TouchGFX is
  * currently linked to internal flash, but this partition must remain reserved
@@ -284,6 +291,7 @@ void WeldData_GetSettings(WeldSettings *settings)
 
 int WeldData_SetSettings(const WeldSettings *settings)
 {
+  if (WaveTest_IsActive() || dryRunActive) return 0;
   if ((settings == NULL) ||
       0)
   {
@@ -293,7 +301,7 @@ int WeldData_SetSettings(const WeldSettings *settings)
   for (unsigned int i = 0U; i < 3U; ++i)
   {
     if ((settings->stage_current_a[i] != settings->stage_current_a[i]) ||
-        (settings->stage_current_a[i] < 0.0f) || (settings->stage_current_a[i] > 1000.0f) ||
+        (settings->stage_current_a[i] < 0.0f) || (settings->stage_current_a[i] > 65535.0f) ||
         (settings->stage_up_ms[i] > 500U) || (settings->stage_time_ms[i] > 999U) ||
         (settings->stage_down_ms[i] > 500U) ||
         ((settings->stage_current_a[i] == 0.0f) != (settings->stage_time_ms[i] == 0U)) ||
@@ -409,6 +417,18 @@ static void FormatFloat2(char *destination, size_t size, float value)
   snprintf(destination, size, "%ld.%02ld", whole, fraction);
 }
 
+/* Keep JSON numeric formatting independent of printf float support in the
+ * embedded C library (which is intentionally disabled in the production link).
+ */
+static void FormatFloat6(char *destination, size_t size, float value)
+{
+  long scaled = (long)((value * 1000000.0f) + ((value >= 0.0f) ? 0.5f : -0.5f));
+  long whole = scaled / 1000000L;
+  long fraction = scaled % 1000000L;
+  if (fraction < 0L) fraction = -fraction;
+  snprintf(destination, size, "%ld.%06ld", whole, fraction);
+}
+
 static void SendAllProfiles(struct netconn *client)
 {
   char response[384], current1[20], current2[20], current3[20];
@@ -521,6 +541,89 @@ static void ProcessCommand(struct netconn *client, char *command)
    * TCP command stream for a long whole-library transfer. */
   UpdateDryRunStatus();
 
+  if (WaveTest_IsActive() && strcmp(command, "STOP") != 0 &&
+      strcmp(command, "TEST STATUS") != 0 && strcmp(command, "GET STATUS") != 0 &&
+      strcmp(command, "PING") != 0)
+  { SendText(client, "ERR BUSY\r\n"); return; }
+
+  if (strcmp(command, "STOP") == 0)
+  {
+    WaveTest_Stop(2U);
+    dryRunActive = 0U;
+    LockData(); weldStatus.welding = 0U; UnlockData();
+    SendText(client, "OK\r\n"); return;
+  }
+  if (strcmp(command, "TEST STATUS") == 0)
+  {
+    WaveTestStatus s;
+    WaveTest_KeepAlive();
+    WaveTest_GetStatus(&s);
+    snprintf(response, sizeof(response),
+      "{\"id\":%lu,\"active\":%lu,\"reason\":%lu,\"time_ms\":%lu,\"duration_ms\":%lu,\"count\":%lu,\"duty_permille\":%lu,\"adc_mean\":%lu,\"secondary_adc\":%lu,\"secondary_filtered_micro\":%lu,\"primary_filtered_micro\":%lu}\r\n",
+      (unsigned long)s.id, (unsigned long)s.active, (unsigned long)s.reason,
+      (unsigned long)s.elapsed_ms, (unsigned long)s.duration_ms, (unsigned long)s.count,
+      (unsigned long)s.duty_permille, (unsigned long)s.adc_mean,
+      (unsigned long)s.secondary_adc, (unsigned long)s.secondary_filtered_micro, (unsigned long)s.primary_filtered_micro);
+    SendText(client, response); return;
+  }
+  if (strcmp(command, "GET PID") == 0)
+  {
+    WavePidConfig p; char kp[24], ki[24], kd[24], target[24]; WaveTest_GetPid(&p);
+    FormatFloat6(kp, sizeof(kp), p.kp); FormatFloat6(ki, sizeof(ki), p.ki);
+    FormatFloat6(kd, sizeof(kd), p.kd); FormatFloat6(target, sizeof(target), p.target);
+    snprintf(response, sizeof(response), "{\"target_mode\":\"stage_adc\",\"kp\":%s,\"ki\":%s,\"kd\":%s,\"target\":%s,\"enabled\":%u}\r\n", kp,ki,kd,target,p.enabled);
+    SendText(client, response); return;
+  }
+  if (strncmp(command, "SET PID", 7) == 0)
+  {
+    WavePidConfig p; WaveTest_GetPid(&p); uint32_t enabledValue = 0U;
+    const char *cursor = command;
+    if (!ParseFloatField(&cursor, "SET PID kp=", &p.kp) ||
+        !ParseFloatField(&cursor, " ki=", &p.ki) ||
+        !ParseFloatField(&cursor, " kd=", &p.kd) ||
+        !ParseFloatField(&cursor, " target=", &p.target) ||
+        !ParseUintField(&cursor, " enabled=", &enabledValue) ||
+        *cursor != '\0' || enabledValue > 1U)
+      SendText(client, "ERR RANGE\r\n");
+    else { p.enabled = (uint8_t)enabledValue; SendText(client, WaveTest_SetPid(&p) ? "OK\r\n" : "ERR BUSY\r\n"); }
+    return;
+  }
+  if (strncmp(command, "TEST START", 10) == 0)
+  {
+    const char *cursor = command;
+    uint32_t duty;
+    if (dryRunActive) SendText(client, "ERR BUSY\r\n");
+    else if (!ParseUintField(&cursor, "TEST START duty_percent=", &duty) || *cursor != '\0')
+      SendText(client, "ERR RANGE\r\n");
+    else
+    {
+      WeldData_GetSettings(&settings);
+      SendText(client, WaveTest_Start(&settings, duty) ? "OK TEST\r\n" : "ERR TEST_NOT_READY\r\n");
+    }
+    return;
+  }
+  if (strcmp(command, "TEST TRACE") == 0)
+  {
+    WaveTestStatus s;
+    WaveTest_GetStatus(&s);
+    snprintf(response, sizeof(response), "TRACE %lu %lu\r\n",
+             (unsigned long)s.id, (unsigned long)s.count);
+    SendText(client, response);
+    for (uint32_t i = 0; i < s.count; ++i)
+    {
+      WaveTestSample p;
+      if (!WaveTest_GetSample(s.id, i, &p)) break;
+      snprintf(response, sizeof(response), "%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu\r\n",
+        (unsigned long)p.time_ms, (unsigned long)p.target_milli,
+        (unsigned long)p.duty_permille, (unsigned long)p.adc_mean,
+        (unsigned long)p.adc_min, (unsigned long)p.adc_max,
+        (unsigned long)p.primary_filtered_micro, (unsigned long)p.secondary_adc,
+        (unsigned long)p.secondary_filtered_micro);
+      SendText(client, response);
+    }
+    SendText(client, "END\r\n"); return;
+  }
+
   if (strcmp(command, "CAPTURE SCREEN") == 0)
   {
     SendScreenCapture(client);
@@ -560,13 +663,15 @@ static void ProcessCommand(struct netconn *client, char *command)
   }
   else if (strcmp(command, "GET STATUS") == 0)
   {
+    WaveTestStatus sense; WaveTest_GetStatus(&sense);
     WeldData_GetStatus(&status);
     FormatFloat2(current1, sizeof(current1), status.actual_current_a);
     snprintf(response, sizeof(response),
-             "{\"type\":\"status\",\"welding\":%u,\"fault\":%u,\"fault_code\":%u,\"current_a\":%s,\"weld_time_ms\":%lu}\r\n",
+             "{\"type\":\"status\",\"welding\":%u,\"fault\":%u,\"fault_code\":%u,\"current_a\":%s,\"weld_time_ms\":%lu,\"adc_mean\":%lu,\"secondary_adc\":%lu,\"secondary_filtered_micro\":%lu,\"primary_filtered_micro\":%lu}\r\n",
              status.welding, status.fault, status.fault_code,
              current1,
-             (unsigned long)status.weld_time_ms);
+             (unsigned long)status.weld_time_ms, (unsigned long)sense.adc_mean,
+             (unsigned long)sense.secondary_adc, (unsigned long)sense.secondary_filtered_micro, (unsigned long)sense.primary_filtered_micro);
     SendText(client, response);
   }
   else if (strcmp(command, "DUMP PROFILES") == 0)
@@ -729,6 +834,7 @@ static void ServeClient(struct netconn *client)
     } while (netbuf_next(buffer) >= 0);
     netbuf_delete(buffer);
   }
+  WaveTest_Stop(3U);
 }
 
 void StartDefaultTask(void *argument)

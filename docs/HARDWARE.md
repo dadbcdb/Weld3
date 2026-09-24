@@ -1,5 +1,94 @@
 # Hardware Reference
 
+## 2026-09-24 active ADC mapping (supersedes shared-input bench mapping)
+
+- ADC1_INP0: PA0_C / A2, primary feedback.
+- ADC2_INP1: PA1_C / A3, user-requested conditioned Rogowski input.
+- Both analogue switches remain OPEN; PA1 Ethernet REF_CLK is isolated from
+  PA1_C. ADC2 channel-1 override is inside CurrentSense_Init USER CODE.
+- Actual wiring, integrator and ampere calibration remain unverified.
+
+## Current single-shot test configuration (2026-09-15)
+
+Supersedes automatic OR-feedback PWM startup described in the historical
+bench section below. Hardware is an existing SG3525-controlled production
+product per the user. The supplied partial schematic shows downstream HC14/
+RC/diode signal shaping and comparator/latch/control logic. Protection exists
+per the user, but exact MCU injection point, logic levels and end-to-end gate
+shutdown path have not been electrically verified by the agent.
+
+- PB7/D9 is A and PD15/D6 is B, active HIGH; timer frequency and centered
+  A/B pulse relationship are retained. Boot output is LOW. TIM4/TIM3 and ADC
+  acquisition keep running internally while idle, with zero-OFF compares.
+- `PWM_WAVE_TEST_ENABLE=1` selects explicit single-shot output; the earlier
+  OR PI and zero-input/fallback behavior are not executed in this mode.
+- PA0_C/A2 remains ADC1/ADC2 channel 0. Both report the same physical input.
+  Logged mean/min/max are uncalibrated ADC codes, not measured amperes.
+- WinApp test limit is per-phase duty, 1..45%, default 5%. This is a software
+  range, not a verified safe rating for the power stage. Largest configured
+  stage current maps to this duty; other stage heights scale proportionally.
+- SQ and COOL request zero output. UP/HOLD/DOWN follow the stored millisecond
+  durations. Each timer pulse center stays T/2 apart. Normal compare changes
+  take effect in successive half periods; allow up to one PWM period of
+  compare-latch latency in addition to the 1-ms envelope resolution.
+- Completion/STOP/fault overrides PB7/PD15 to GPIO LOW, which may truncate
+  the final pulse. Confirm transient transformer behavior and downstream gate
+  polarity before energized operation. No independent gate-enable pin or
+  calibrated current protection has been added by this firmware.
+- Debug PAUSE still freezes PWM at its instantaneous level, possibly HIGH.
+  Never use PAUSE/single-stepping while this output drives an energized stage.
+
+
+## Active bench OR/PID configuration (2026-09-14)
+
+This section supersedes the older PWM/ADC assignments below for this test build.
+Power-stage operation is not authorized or validated.
+
+Debugger PAUSE freezes TIM3 and TIM4 together. PWM holds its instantaneous
+level (possibly HIGH) for the halt duration; RUN is expected to continue the
+paused waveform. This creates a stretched pulse/gap on the scope, not a safe
+gate shutdown. One already-triggered ADC conversion may finish during halt.
+
+The current TEST-ONLY build uses PWM_OR_BENCH_ALLOW_ZERO=1: all-LOW input
+continues PI and increases commanded OR occupancy to its 90% limit (45% per
+phase). The LOW diagnostic remains visible. All-HIGH input still holds fixed
+12.5% per phase via PWM_OR_BENCH_HOLD_ON_INVALID=1. Set both macros to 0 for
+strict constant-input shutdown. Acquisition faults still stop both pins.
+For a deterministic zero-input test, disconnect the PWM source from A2 and
+pull A2 to signal GND; never ground a driven PWM output. An unplugged input
+may float. This test configuration must not drive an energized power stage.
+
+- PWM A: PB7 / Arduino D9 / TIM4_CH2, active HIGH PWM1.
+- PWM B: PD15 / Arduino D6 / TIM4_CH4, active HIGH PWM2 with a different CCR.
+- TIM4 center-aligned, PSC=0, ARR=32768: full period 65536 ticks,
+  nominal 4.196167 kHz at 275 MHz. A is centered at CNT=0; B at CNT=ARR.
+  CCR2=w, CCR4=32768-w. Each pulse is approximately 2w ticks wide and
+  centers are 119.156 us apart. Initial w=4096 (12.5% each, 25% OR);
+  target OR occupancy 50% means approximately 25% per phase.
+- User requested moving OR feedback to PA0_C / Arduino A2. ADC1_INP0 is
+  now the feedback input (DMA low halfword). ADC2_INP0 samples the same pin
+  for duplicate diagnostics, not an independent sensor. PA0 analogue switch
+  remains OPEN, isolating PA0 / Arduino D3; its TIM5 override leaves it ANALOG.
+  PA1_C / A3 is no longer sampled. PA1 stays Ethernet REF_CLK.
+  Input mapping is supported by
+  [ST DS13312](https://www.st.com/resource/en/datasheet/stm32h735ag.pdf);
+  physical wiring has not been checked on the board.
+- ADC12 prescaler DIV2, nominal 40 MHz from current PLL2P=80 MHz;
+  32.5-cycle sample time, 16-bit conversions, 64 simultaneous pairs/period.
+  PG3 remains a DMA processing marker twice per full PWM period.
+- Scope startup includes a shortened first A pulse because counting begins at
+  A's center. Two DMA halves are discarded. After settling, observe equal A/B
+  widths separated by half a period and two OR pulses per period. At the 50%
+  OR target, each width and each intervening LOW gap is about 59.58 us.
+- OR occupancy is bounded to 10..90%, leaving nominal gaps of at least 11.92 us.
+  This is waveform spacing, not a verified IGBT gate dead-time specification.
+- The supplied diagram labels R1 as 100 ohms. At a nominal 2.6 V HIGH this
+  would draw about 26 mA from the driving GPIO. Use a suitably light load
+  (e.g. 10 kilohms for this logic test), and verify HIGH/LOW levels and edges
+  with the scope. The 1N4001 waveform at this timing has not been verified.
+  Keep PA0_C within the board's ADC voltage range and share signal GND.
+
+
 ## Controller
 
 - MCU: STM32H735IGK6
