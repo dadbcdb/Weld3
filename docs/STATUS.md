@@ -1,5 +1,62 @@
 # Project Status
 
+## 2026-09-26 — Stage ADC-target maximum reduced to 10000
+
+WinApp labels and validates stage ADC targets as 0..10000. Firmware
+`WeldData_SetSettings` and `WaveTest_Start` enforce the same shared maximum,
+so direct protocol clients cannot bypass the UI limit. Raw ADC data remains
+0..65535. Follow-up clarified that every timing setting must also reach 10000;
+SQ/COOL, UP, Weld Time and DOWN now each accept 0..10000 ms in WinApp and
+firmware, with a 120000-ms maximum total sequence. Twelve host tests and the
+WinApp Debug build pass with zero warnings/errors. Energized-duration safety
+has not been validated.
+
+## 2026-09-26 — WinApp settings persist across exit
+
+WinApp now saves local UI state on normal window close to
+`%LocalAppData%/WeldApp/settings.json` and restores it at the next launch.
+Saved state includes IP/port/simulation, selected profile slots, all three
+stage rows, PWM-test enable, duty limit, 1/2-kHz selection, PID enable and
+Kp/Ki/Kd. Window geometry remains in its separate `window.json`. Loaded stage
+values are range-checked; malformed/missing files fall back silently to safe
+defaults. Release publish completed successfully.
+
+## 2026-09-26 — Selectable 1/2-kHz PWM single-shot
+
+WinApp now offers only 1 kHz and 2 kHz (default) and sends the selected rate
+with `TEST START`. Firmware rejects every other value, reports the active
+selection, forces both outputs LOW during rate changes, restarts ADC DMA, and
+keeps exactly 64 paired ADC samples per PWM period by matching TIM3/TIM4
+prescalers. Nominal choices calculate to approximately 1000.204/2000.407 Hz
+at 275 MHz. Twelve host tests and the WinApp Release build pass. ARM linking
+was not available because GNU Make/ARM GCC are absent from this environment;
+target scope validation remains required.
+
+Follow-up after a reported 1-kHz `ERR TEST_NOT_READY`: the formerly generic
+start failure now exposes `start_reject` in `TEST STATUS`. WinApp translates
+codes for invalid settings/frequency, already-active state, latched ADC/PWM
+fault, missing/stale DMA, and ADC DMA stop/restart failure. This diagnostic
+does not bypass any fault or readiness condition. Twelve host tests and the
+refreshed WinApp package pass; the new firmware must be rebuilt/flashed before
+the detailed code is available from the target.
+
+Target log then confirmed the 1-kHz switch completed (`pwm_frequency_hz=1000`)
+and the run stopped at time zero with acquisition reason 4. The rate-switch
+path now clears every DMA1 Stream0 status flag and its NVIC pending IRQ after
+aborting the old-rate DMA and before starting the new block. This prevents an
+old-rate callback from being interpreted as the first new-rate DMA half. Status
+also reports `current_fault`, `pwm_fault`, and `current_fault_detail`; WinApp
+decodes detail reasons 1..6. This is a targeted race correction, not a fault
+bypass. All twelve host tests and WinApp publish pass; target confirmation is
+still required.
+
+The next target report identified `current_fault_detail=6` at time zero. This
+was the compare-preload phase guard requiring one TIM4 DIR value even though a
+mid-slot ADC callback can be published immediately before or after the counter
+direction transition. The guard now checks only that half 0 is within 2048
+ticks of ARR and half 1 within 2048 ticks of zero. It still faults phase drift
+outside those windows; DMA order, ownership and deadline guards are unchanged.
+
 ## 2026-09-25 — User-settable WinApp integration offset
 
 Added an automatic/manual offset control to the Rogowski waveform tab. Auto

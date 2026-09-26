@@ -43,7 +43,9 @@
 #define PWM_WAVE_TEST_ENABLE   1U /* Explicit single-shot mode; no boot PWM. */
 #define PWM_B_CHANNEL          TIM_CHANNEL_4
 #define ADC_TRIGGER_CHANNEL    TIM_CHANNEL_3
-#define PWM_PERIOD_TICKS       65536U
+#define PWM_HALF_PERIOD_TICKS  34368U /* 64 exact ADC slots per full period. */
+#define PWM_PERIOD_TICKS       (2U * PWM_HALF_PERIOD_TICKS)
+#define PWM_DEFAULT_HZ         2000U
 #define PWM_TEST_INITIAL_CCR   4096U
 #define PWM_OR_THRESHOLD       20000U
 #define PWM_OR_TARGET          0.50f
@@ -211,6 +213,8 @@ static uint32_t waveLimit, waveRunPairs, waveLeaseTick, waveDmaTick;
 static uint32_t waveInterval, waveNextLog, waveArmHalves;
 static WavePidConfig wavePid = {0.20f, 15.0f, 0.0f, 0.50f, 0U};
 static float waveIntegral, wavePrevious, waveOutput;
+static uint32_t wavePwmFrequencyHz = PWM_DEFAULT_HZ;
+static uint32_t waveStartReject;
 /* Feedback-only low-pass: tau=1 ms, nominal coefficient about 0.1065.
  * State is seeded from the current ADC mean at every single-shot start. */
 static const float waveFilterTauSeconds = 0.001f;
@@ -258,6 +262,7 @@ void StartDefaultTask(void *argument);
 extern void TouchGFX_Task(void *argument);
 static void LCD_DelayMs(uint32_t milliseconds);
 static void CurrentSense_Init(void);
+static int CurrentSense_SetPwmFrequency(uint32_t frequency_hz);
 static void DacSine_Start(void);
 static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count);
 /* USER CODE END PFP */
@@ -1402,7 +1407,8 @@ static void MX_TIM4_Init(void)
   /* Bench-only center-aligned PWM: full period = 2*32768 timer ticks.
      PWM1 at zero and PWM2 at ARR give equal pulses T/2 apart. */
   htim4.Init.CounterMode = TIM_COUNTERMODE_CENTERALIGNED1;
-  htim4.Init.Period = PWM_PERIOD_TICKS / 2U;
+  htim4.Init.Prescaler = 1U; /* Default 2 kHz; selectable 1/2 kHz before a run. */
+  htim4.Init.Period = PWM_HALF_PERIOD_TICKS;
   if (HAL_TIM_PWM_Init(&htim4) != HAL_OK) Error_Handler();
   sConfigOC.OCMode = TIM_OCMODE_PWM2;
   if (HAL_TIM_PWM_ConfigChannel(&htim4, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
@@ -2089,10 +2095,13 @@ static void CurrentSense_ProcessBlock(uint32_t offset, uint32_t count)
 #endif
   if (g_pwmOrFault == 0U)
   {
-    uint32_t direction = TIM4->CR1 & TIM_CR1_DIR;
     uint32_t position = TIM4->CNT;
-    if (((half == 0U) && ((direction == 0U) || (position < 2048U))) ||
-        ((half != 0U) && ((direction != 0U) || (position > TIM4->ARR - 2048U))))
+    /* Samples are centered in their TIM3 slots, so DMA publication can land
+     * immediately before or after the TIM4 extremum. DIR legitimately differs
+     * across that boundary. Validate the strict extremum position window;
+     * requiring one DIR value falsely rejects a correctly phased 1-kHz run. */
+    if (((half == 0U) && (position < TIM4->ARR - 2048U)) ||
+        ((half != 0U) && (position > 2048U)))
     {
       CurrentSense_RecordFault(6U, offset, entryRemaining,
                               __HAL_DMA_GET_COUNTER(&hdma_adc1), start);
@@ -2150,7 +2159,7 @@ static void CurrentSense_Init(void)
           DBGMCU_APB1LFZ1_DBG_TIM3 | DBGMCU_APB1LFZ1_DBG_TIM4);
 
   if ((RCC->CFGR & RCC_CFGR_TIMPRE) != 0U ||
-      (htim4.Init.Prescaler != 0U) || (pwmTicks != 65536U) ||
+      (htim4.Init.Prescaler != 1U) || (pwmTicks != PWM_PERIOD_TICKS) ||
       (htim4.Init.CounterMode != TIM_COUNTERMODE_CENTERALIGNED1) ||
       ((TIM4->CR1 & TIM_CR1_CEN) != 0U))
     Error_Handler();
@@ -2159,22 +2168,26 @@ static void CurrentSense_Init(void)
   {
     timerClock *= 2U;
   }
-  g_currentSampleRateHz = timerClock / sampleTicks;
+  g_currentSampleRateHz = timerClock /
+                          ((htim4.Init.Prescaler + 1U) * sampleTicks);
+  waveStatus.pwm_frequency_hz = PWM_DEFAULT_HZ;
   CurrentFeedbackFilter_Init(&secondaryFeedbackFilter,
       (float)CURRENT_DMA_HALF / (float)g_currentSampleRateHz, 0.001f);
   g_currentHalfBudgetCycles = (uint32_t)(((uint64_t)SystemCoreClock *
-                                           (pwmTicks / 2U)) / timerClock);
+                                           (pwmTicks / 2U) *
+                                           (htim4.Init.Prescaler + 1U)) /
+                                          timerClock);
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
   __HAL_RCC_TIM3_CLK_ENABLE();
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0U;
+  htim3.Init.Prescaler = htim4.Init.Prescaler;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = sampleTicks - 1U;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim3) != HAL_OK) Error_Handler();
-  /* OC4REF rises halfway through each 1024-tick sample interval.
+  /* OC4REF rises halfway through each sample interval.
      CC4 output is NOT enabled and no TIM3 GPIO is configured. */
   oc.OCMode = TIM_OCMODE_PWM2;
   oc.Pulse = sampleTicks / 2U;
@@ -2252,6 +2265,69 @@ static void WaveTest_OutputsOff(void)
   g_pwmOrCommand = 0.0f;
 }
 
+/* Change frequency only with both PWM pins forced LOW. TIM3 uses the same
+ * prescaler as TIM4 so its 64 ADC slots retain the same phase in every PWM
+ * period. Restart DMA to discard a partial block from the previous rate. */
+#ifndef WAVE_TEST_HOST
+static int CurrentSense_SetPwmFrequency(uint32_t frequency_hz)
+{
+  uint32_t prescaler;
+  if (frequency_hz == 2000U) prescaler = 1U;
+  else if (frequency_hz == 1000U) prescaler = 3U;
+  else { waveStartReject = 2U; return 0; }
+  if (waveStatus.active) { waveStartReject = 3U; return 0; }
+  if (g_currentSenseFault || g_pwmOrFault) { waveStartReject = 4U; return 0; }
+
+  WaveTest_OutputsOff();
+  uint32_t mask = __get_PRIMASK();
+  __disable_irq();
+  CLEAR_BIT(TIM4->CR1, TIM_CR1_CEN);
+  CLEAR_BIT(TIM3->CR1, TIM_CR1_CEN);
+  if (HAL_ADCEx_MultiModeStop_DMA(&hadc1) != HAL_OK)
+  { waveStartReject = 7U; __set_PRIMASK(mask); return 0; }
+
+  htim4.Init.Prescaler = prescaler;
+  htim3.Init.Prescaler = prescaler;
+  TIM4->PSC = prescaler;
+  TIM3->PSC = prescaler;
+  TIM4->EGR = TIM_EGR_UG;
+  TIM3->EGR = TIM_EGR_UG;
+  TIM4->CNT = 0U;
+  TIM3->CNT = 0U;
+  TIM4->SR = 0U;
+  TIM3->SR = 0U;
+  /* HAL abort can leave an already-latched Stream0 IRQ pending. If it runs
+   * after NDTR is reset, the callback belongs to the old rate and falsely
+   * trips the strict half-buffer order/ownership checks at time zero. */
+  DMA1->LIFCR = DMA_LIFCR_CFEIF0 | DMA_LIFCR_CDMEIF0 | DMA_LIFCR_CTEIF0 |
+                DMA_LIFCR_CHTIF0 | DMA_LIFCR_CTCIF0;
+  NVIC_ClearPendingIRQ(DMA1_Stream0_IRQn);
+  currentExpectedOffset = 0U;
+  g_currentWarmupBlocks = 2U;
+  SCB_CleanInvalidateDCache_by_Addr((uint32_t *)g_currentDmaBuffer,
+                                   sizeof(g_currentDmaBuffer));
+  if (HAL_ADCEx_MultiModeStart_DMA(&hadc1, g_currentDmaBuffer,
+                                   CURRENT_DMA_SAMPLES) != HAL_OK)
+  { waveStartReject = 8U; __set_PRIMASK(mask); return 0; }
+
+  uint32_t timerClock = HAL_RCC_GetPCLK1Freq();
+  if ((RCC->D2CFGR & RCC_D2CFGR_D2PPRE1_Msk) != RCC_D2CFGR_D2PPRE1_DIV1)
+    timerClock *= 2U;
+  uint32_t sampleTicks = PWM_PERIOD_TICKS / CURRENT_DMA_SAMPLES;
+  g_currentSampleRateHz = timerClock / ((prescaler + 1U) * sampleTicks);
+  CurrentFeedbackFilter_Init(&secondaryFeedbackFilter,
+      (float)CURRENT_DMA_HALF / (float)g_currentSampleRateHz, 0.001f);
+  g_currentHalfBudgetCycles = (uint32_t)(((uint64_t)SystemCoreClock *
+      (PWM_PERIOD_TICKS / 2U) * (prescaler + 1U)) / timerClock);
+  waveDmaTick = HAL_GetTick();
+  wavePwmFrequencyHz = frequency_hz;
+  waveStatus.pwm_frequency_hz = frequency_hz;
+  SET_BIT(TIM4->CR1, TIM_CR1_CEN);
+  __set_PRIMASK(mask);
+  return 1;
+}
+#endif
+
 static void WaveTest_Log(float target)
 {
   if (waveStatus.count >= 2048U) return;
@@ -2289,28 +2365,41 @@ void WaveTest_Stop(uint32_t reason)
   __set_PRIMASK(mask);
 }
 
-int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent)
+int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent,
+                   uint32_t pwm_frequency_hz)
 {
+  waveStartReject = 0U;
   if (!PWM_WAVE_TEST_ENABLE || !s || duty_percent < 1U || duty_percent > 45U)
-    return 0;
+  { waveStartReject = 1U; return 0; }
+  if (pwm_frequency_hz != 1000U && pwm_frequency_hz != 2000U)
+  { waveStartReject = 2U; return 0; }
   float peak = 0.0f;
-  if (s->squeeze_ms > 999U || s->cool_ms[0] > 999U || s->cool_ms[1] > 999U) return 0;
+  if (s->squeeze_ms > 10000U || s->cool_ms[0] > 10000U || s->cool_ms[1] > 10000U)
+  { waveStartReject = 1U; return 0; }
   for (unsigned i = 0; i < 3; ++i)
   {
     float v = s->stage_current_a[i];
-    if (!(v >= 0.0f && v <= 65535.0f) || s->stage_up_ms[i] > 500U ||
-        s->stage_time_ms[i] > 999U || s->stage_down_ms[i] > 500U ||
+    if (!(v >= 0.0f && v <= WELD_STAGE_TARGET_MAX) || s->stage_up_ms[i] > 10000U ||
+        s->stage_time_ms[i] > 10000U || s->stage_down_ms[i] > 10000U ||
         ((v == 0.0f) != (s->stage_time_ms[i] == 0U)) ||
-        (v == 0.0f && (s->stage_up_ms[i] || s->stage_down_ms[i]))) return 0;
+        (v == 0.0f && (s->stage_up_ms[i] || s->stage_down_ms[i])))
+    { waveStartReject = 1U; return 0; }
     if (v > peak) peak = v;
   }
   uint32_t duration = WaveTest_Duration(s);
-  if (peak == 0.0f || duration == 0U || duration > 9000U) return 0;
+  if (peak == 0.0f || duration == 0U || duration > 120000U)
+  { waveStartReject = 1U; return 0; }
   uint32_t mask = __get_PRIMASK();
   __disable_irq();
-  if (waveStatus.active || g_currentSenseFault || g_pwmOrFault ||
-      g_currentDmaBlocks == 0U || HAL_GetTick() - waveDmaTick > 3U)
-  { __set_PRIMASK(mask); return 0; }
+  if (waveStatus.active) waveStartReject = 3U;
+  else if (g_currentSenseFault || g_pwmOrFault) waveStartReject = 4U;
+  else if (g_currentDmaBlocks == 0U) waveStartReject = 5U;
+  else if (HAL_GetTick() - waveDmaTick > 3U) waveStartReject = 6U;
+  if (waveStartReject != 0U) { __set_PRIMASK(mask); return 0; }
+  __set_PRIMASK(mask);
+  if (!CurrentSense_SetPwmFrequency(pwm_frequency_hz)) return 0;
+  mask = __get_PRIMASK();
+  __disable_irq();
   WaveTest_OutputsOff();
   waveSettings = *s; /* Immutable for this run. No RTOS call from acquisition IRQ. */
   wavePeak = peak;
@@ -2324,6 +2413,7 @@ int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent)
   waveStatus.reason = 0U;
   waveStatus.elapsed_ms = waveStatus.count = waveStatus.duty_permille = 0U;
   waveStatus.duration_ms = duration;
+  waveStatus.pwm_frequency_hz = wavePwmFrequencyHz;
   waveInterval = (duration + 2045U) / 2046U;
   waveNextLog = 0U;
   waveRunPairs = 0U;
@@ -2343,6 +2433,10 @@ void WaveTest_GetStatus(WaveTestStatus *s)
   s->primary_filtered_micro = (uint32_t)(g_wavePidFiltered * 1000000.0f + 0.5f);
   s->secondary_adc = g_secondaryCurrentAdc;
   s->secondary_filtered_micro = (uint32_t)(g_secondaryCurrentFiltered * 1000000.0f + 0.5f);
+  s->start_reject = waveStartReject;
+  s->current_fault = g_currentSenseFault;
+  s->pwm_fault = g_pwmOrFault;
+  s->current_fault_detail = g_currentFaultDetail.reason;
   __set_PRIMASK(mask);
 }
 int WaveTest_GetSample(uint32_t id, uint32_t index, WaveTestSample *s)

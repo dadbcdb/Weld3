@@ -1,5 +1,23 @@
 # Hardware Reference
 
+## 2026-09-26 selectable 1/2-kHz single-shot PWM timing
+
+- The current single-shot build no longer offers 4 kHz. WinApp selects a
+  nominal 1 kHz or 2 kHz before `TEST START`; boot/default is 2 kHz.
+- TIM4 remains center-aligned with ARR=34368. TIM4 PSC=1 gives approximately
+  2000.407 Hz and PSC=3 gives approximately 1000.204 Hz at the verified
+  275-MHz APB1 timer clock. A remains centered at CNT=0 and B at CNT=ARR.
+- TIM3 always receives the same prescaler as TIM4 and retains 1074 timer ticks
+  per ADC slot. Both modes therefore retain exactly 64 simultaneous ADC pairs
+  per PWM period: approximately 128.026 kS/s at 2 kHz and 64.013 kS/s at
+  1 kHz. The two PWM pulse centers remain exactly half a period apart.
+- Frequency changes are accepted only while the single-shot is inactive. Both
+  output pins are forced GPIO LOW, TIM3/TIM4 and ADC DMA are stopped, partial
+  acquisition is discarded, and acquisition is restarted before output arming.
+- The TIM4 override remains in the `USER CODE BEGIN TIM4_Init 2` region, but
+  `weld3.ioc` still contains generated legacy timer values. CubeMX regeneration
+  must preserve/review this override and must not be treated as validation.
+
 ## 2026-09-24 active ADC mapping (supersedes shared-input bench mapping)
 
 - ADC1_INP0: PA0_C / A2, primary feedback.

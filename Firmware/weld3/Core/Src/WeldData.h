@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define WELD_STAGE_TARGET_MAX 10000.0f
+
 #ifdef __cplusplus
 extern "C" {
 #endif

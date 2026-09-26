@@ -1,5 +1,32 @@
 # Design Decisions
 
+## 2026-09-26 — Configured stage target is capped at 10000 ADC counts
+
+Limit each profile stage's configured ADC target to 0..10000 in both WinApp
+and firmware. This is an input/configuration ceiling only: ADC acquisition,
+filter normalization and diagnostic displays remain 16-bit 0..65535. Existing
+saved local stage values above 10000 are not restored. At user direction, all
+profile timing fields (SQ/COOL, UP, Weld Time and DOWN) also accept 0..10000 ms.
+The complete single-shot sequence remains bounded to the mathematical maximum
+of 120000 ms; this does not establish an electrically safe energized duration.
+
+## 2026-09-26 — Single-shot PWM permits only nominal 1 kHz or 2 kHz
+
+Remove the former 4.196-kHz test timing from the active single-shot path. Use
+TIM4 center-aligned ARR=34368 with PSC=1 for nominal 2 kHz and PSC=3 for
+nominal 1 kHz. TIM3 uses the identical prescaler and an exact 1074-tick ADC
+slot, preserving 64 paired samples per PWM period and fixed midpoint sampling.
+Frequency changes occur only while output GPIOs are forced LOW; ADC DMA is
+restarted to discard a partial old-rate block before the output is armed.
+The CubeMX-generated legacy initialization remains superseded inside a USER
+CODE section and requires review after any `.ioc` regeneration.
+
+DMA half publication is validated by its position near the corresponding TIM4
+extremum (ARR for half 0, zero for half 1). Do not require a fixed TIM4 DIR bit
+inside that window: midpoint ADC sampling permits callback publication on
+either side of the direction transition. The ±2048-tick extremum window and
+all DMA ownership, ordering and processing-deadline checks remain enforced.
+
 ## 2026-09-25 — Manual Rogowski offset is an explicit fixed override
 
 WinApp keeps guarded pre-PWM mean detection as the default, but permits the

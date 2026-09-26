@@ -473,6 +473,19 @@
                                     Text="5"
                                     Width="45"
                                     ToolTip="1~45%. 최대 ADC 목표을 이 듀티에 맞추고 나머지 단계는 비례 적용합니다." />
+                                <TextBlock
+                                    Text="PWM 주파수"
+                                    VerticalAlignment="Center"
+                                    Margin="10,0,3,0" />
+                                <ComboBox
+                                    x:Name="PwmFrequencyBox"
+                                    Width="76"
+                                    SelectedIndex="1"
+                                    SelectionChanged="PwmFrequency_SelectionChanged"
+                                    ToolTip="시험 PWM 주파수. 출력 시작 전에만 변경됩니다.">
+                                    <ComboBoxItem Content="1 kHz" />
+                                    <ComboBoxItem Content="2 kHz" />
+                                </ComboBox>
                             </WrapPanel>
                             <WrapPanel
                                 Margin="0,7,0,0">
@@ -511,7 +524,7 @@
                                     Click="ApplyPidButton_Click" />
                             </WrapPanel>
                             <TextBlock
-                                Text="PID 목표는 표의 ADC 값(0~65535)입니다. UP/DOWN은 목표 상승·하강 시간입니다. 기존 파일의 숫자는 그대로 ADC 값으로 해석됩니다."
+                                Text="ADC 목표와 모든 시간값(SQ/COOL·UP·Weld Time·DOWN)은 0~10000입니다. 시간 단위는 ms입니다."
                                 Foreground="#FBBF24"
                                 TextWrapping="Wrap"
                                 Margin="0,4,0,0" />
@@ -586,7 +599,7 @@
                 <TabItem
                     Header="ADC 목표 파형">
                     <GroupBox
-                        Header="설정 ADC 목표 (0~65535)">
+                        Header="설정 ADC 목표 (0~10000)">
                         <local:WaveformPreview
                             x:Name="SettingWaveform" />
                     </GroupBox>

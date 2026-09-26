@@ -297,13 +297,14 @@ int WeldData_SetSettings(const WeldSettings *settings)
   {
     return 0;
   }
-  if (settings->squeeze_ms > 999U) return 0;
+  if (settings->squeeze_ms > 10000U) return 0;
   for (unsigned int i = 0U; i < 3U; ++i)
   {
     if ((settings->stage_current_a[i] != settings->stage_current_a[i]) ||
-        (settings->stage_current_a[i] < 0.0f) || (settings->stage_current_a[i] > 65535.0f) ||
-        (settings->stage_up_ms[i] > 500U) || (settings->stage_time_ms[i] > 999U) ||
-        (settings->stage_down_ms[i] > 500U) ||
+        (settings->stage_current_a[i] < 0.0f) ||
+        (settings->stage_current_a[i] > WELD_STAGE_TARGET_MAX) ||
+        (settings->stage_up_ms[i] > 10000U) || (settings->stage_time_ms[i] > 10000U) ||
+        (settings->stage_down_ms[i] > 10000U) ||
         ((settings->stage_current_a[i] == 0.0f) != (settings->stage_time_ms[i] == 0U)) ||
         ((settings->stage_current_a[i] == 0.0f) &&
          ((settings->stage_up_ms[i] != 0U) || (settings->stage_down_ms[i] != 0U))))
@@ -311,7 +312,7 @@ int WeldData_SetSettings(const WeldSettings *settings)
       return 0;
     }
   }
-  if ((settings->cool_ms[0] > 999U) || (settings->cool_ms[1] > 999U)) return 0;
+  if ((settings->cool_ms[0] > 10000U) || (settings->cool_ms[1] > 10000U)) return 0;
   LockData();
   weldSettings = *settings;
   UnlockData();
@@ -559,11 +560,14 @@ static void ProcessCommand(struct netconn *client, char *command)
     WaveTest_KeepAlive();
     WaveTest_GetStatus(&s);
     snprintf(response, sizeof(response),
-      "{\"id\":%lu,\"active\":%lu,\"reason\":%lu,\"time_ms\":%lu,\"duration_ms\":%lu,\"count\":%lu,\"duty_permille\":%lu,\"adc_mean\":%lu,\"secondary_adc\":%lu,\"secondary_filtered_micro\":%lu,\"primary_filtered_micro\":%lu}\r\n",
+      "{\"id\":%lu,\"active\":%lu,\"reason\":%lu,\"time_ms\":%lu,\"duration_ms\":%lu,\"count\":%lu,\"duty_permille\":%lu,\"adc_mean\":%lu,\"secondary_adc\":%lu,\"secondary_filtered_micro\":%lu,\"primary_filtered_micro\":%lu,\"pwm_frequency_hz\":%lu,\"start_reject\":%lu,\"current_fault\":%lu,\"pwm_fault\":%lu,\"current_fault_detail\":%lu}\r\n",
       (unsigned long)s.id, (unsigned long)s.active, (unsigned long)s.reason,
       (unsigned long)s.elapsed_ms, (unsigned long)s.duration_ms, (unsigned long)s.count,
       (unsigned long)s.duty_permille, (unsigned long)s.adc_mean,
-      (unsigned long)s.secondary_adc, (unsigned long)s.secondary_filtered_micro, (unsigned long)s.primary_filtered_micro);
+      (unsigned long)s.secondary_adc, (unsigned long)s.secondary_filtered_micro,
+      (unsigned long)s.primary_filtered_micro, (unsigned long)s.pwm_frequency_hz,
+      (unsigned long)s.start_reject, (unsigned long)s.current_fault,
+      (unsigned long)s.pwm_fault, (unsigned long)s.current_fault_detail);
     SendText(client, response); return;
   }
   if (strcmp(command, "GET PID") == 0)
@@ -591,14 +595,15 @@ static void ProcessCommand(struct netconn *client, char *command)
   if (strncmp(command, "TEST START", 10) == 0)
   {
     const char *cursor = command;
-    uint32_t duty;
+    uint32_t duty, frequency;
     if (dryRunActive) SendText(client, "ERR BUSY\r\n");
-    else if (!ParseUintField(&cursor, "TEST START duty_percent=", &duty) || *cursor != '\0')
+    else if (!ParseUintField(&cursor, "TEST START duty_percent=", &duty) ||
+             !ParseUintField(&cursor, " frequency_hz=", &frequency) || *cursor != '\0')
       SendText(client, "ERR RANGE\r\n");
     else
     {
       WeldData_GetSettings(&settings);
-      SendText(client, WaveTest_Start(&settings, duty) ? "OK TEST\r\n" : "ERR TEST_NOT_READY\r\n");
+      SendText(client, WaveTest_Start(&settings, duty, frequency) ? "OK TEST\r\n" : "ERR TEST_NOT_READY\r\n");
     }
     return;
   }

@@ -37,13 +37,16 @@ typedef struct {
   uint32_t id, active, reason, elapsed_ms, duration_ms, count;
   uint32_t duty_permille, adc_mean;
   uint32_t secondary_adc, secondary_filtered_micro, primary_filtered_micro;
+  uint32_t pwm_frequency_hz;
+  uint32_t start_reject;
+  uint32_t current_fault, pwm_fault, current_fault_detail;
 } WaveTestStatus;
 typedef struct { float kp, ki, kd, target; uint8_t enabled; } WavePidConfig;
 /* reason: 0=idle, 1=completed, 2=STOP, 3=disconnect/lease, 4=acquisition */
 #ifdef __cplusplus
 extern "C" {
 #endif
-int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent);
+int WaveTest_Start(const WeldSettings *s, uint32_t duty_percent, uint32_t pwm_frequency_hz);
 void WaveTest_Stop(uint32_t reason);
 void WaveTest_KeepAlive(void);
 void WaveTest_GetStatus(WaveTestStatus *status);

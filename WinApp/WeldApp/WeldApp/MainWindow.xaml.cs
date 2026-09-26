@@ -34,11 +34,19 @@ public partial class MainWindow : Window
     uint loadedTestId;
     Settings testSettings;
     double testDuty;
+    int testFrequency = 2000;
     readonly List<string> testTrace = [];
     RogowskiCapture? rogowskiCapture;
 
     sealed record WindowLayout(double Left, double Top, double Width, double Height);
+    sealed record SavedStage(double Current, uint Up, uint Hold, uint Down, uint Cool);
+    sealed record SavedAppSettings(
+        string IpAddress, string Port, bool Simulation,
+        int ProfileFile, int ProfileNumber,
+        SavedStage[] Stages, bool PwmTest, string Duty, int PwmFrequency,
+        bool PidEnabled, string PidKp, string PidKi, string PidKd);
     static string WindowLayoutPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WeldApp", "window.json");
+    static string AppSettingsPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WeldApp", "settings.json");
     public MainWindow()
     {
         InitializeComponent();
@@ -48,6 +56,7 @@ public partial class MainWindow : Window
         ProfileFileBox.SelectedIndex = 0;
         ProfileNumberBox.SelectedIndex = 0;
         changingUiProfile = false;
+        LoadAppSettings();
         timer.Tick += Poll;
         activeUiProfileKey = SelectedProfileKey();
         profiles[activeUiProfileKey] = GetUiSettings();
@@ -83,6 +92,62 @@ public partial class MainWindow : Window
                 return;
             Directory.CreateDirectory(d);
             File.WriteAllText(WindowLayoutPath, JsonSerializer.Serialize(new WindowLayout(RestoreBounds.Left, RestoreBounds.Top, RestoreBounds.Width, RestoreBounds.Height)));
+        }
+        catch { }
+    }
+
+    void LoadAppSettings()
+    {
+        try
+        {
+            if (!File.Exists(AppSettingsPath))
+                return;
+            SavedAppSettings? x = JsonSerializer.Deserialize<SavedAppSettings>(File.ReadAllText(AppSettingsPath));
+            if (x is null)
+                return;
+            IpAddressBox.Text = x.IpAddress;
+            PortBox.Text = x.Port;
+            SimulationCheckBox.IsChecked = x.Simulation;
+            changingUiProfile = true;
+            ProfileFileBox.SelectedIndex = x.ProfileFile is >= 0 and <= 15 ? x.ProfileFile : 0;
+            ProfileNumberBox.SelectedIndex = x.ProfileNumber is >= 0 and <= 15 ? x.ProfileNumber : 0;
+            changingUiProfile = false;
+            if (x.Stages is { Length: 3 })
+                for (int i = 0; i < 3; i++)
+                {
+                    SavedStage stage = x.Stages[i];
+                    if (double.IsFinite(stage.Current) && stage.Current is >= 0 and <= 10000 &&
+                        stage.Up <= 10000 && stage.Hold <= 10000 &&
+                        stage.Down <= 10000 && stage.Cool <= 10000)
+                        StageRows[i].Set(stage.Current, stage.Up, stage.Hold, stage.Down, stage.Cool);
+                }
+            PwmTestCheckBox.IsChecked = x.PwmTest;
+            TestDutyBox.Text = x.Duty;
+            PwmFrequencyBox.SelectedIndex = x.PwmFrequency == 1000 ? 0 : 1;
+            PidEnableCheckBox.IsChecked = x.PidEnabled;
+            PidKpBox.Text = x.PidKp;
+            PidKiBox.Text = x.PidKi;
+            PidKdBox.Text = x.PidKd;
+        }
+        catch { }
+    }
+
+    void SaveAppSettings()
+    {
+        try
+        {
+            string? directory = Path.GetDirectoryName(AppSettingsPath);
+            if (directory is null)
+                return;
+            Directory.CreateDirectory(directory);
+            var stages = StageRows.Select(x => new SavedStage(x.Current, x.Up, x.Hold, x.Down, x.Cool)).ToArray();
+            var settings = new SavedAppSettings(
+                IpAddressBox.Text, PortBox.Text, SimulationCheckBox.IsChecked == true,
+                SelectedProfileNumber(ProfileFileBox), SelectedProfileNumber(ProfileNumberBox), stages,
+                PwmTestCheckBox.IsChecked == true,
+                TestDutyBox.Text, PwmFrequencyBox.SelectedIndex == 0 ? 1000 : 2000,
+                PidEnableCheckBox.IsChecked == true, PidKpBox.Text, PidKiBox.Text, PidKdBox.Text);
+            File.WriteAllText(AppSettingsPath, JsonSerializer.Serialize(settings));
         }
         catch { }
     }
@@ -431,8 +496,10 @@ public partial class MainWindow : Window
     {
         double[] currents = [x.Current1, x.Current2, x.Current3];
         uint[] hold = [x.Time1, x.Time2, x.Time3], up = [x.Up1, x.Up2, x.Up3], down = [x.Down1, x.Down2, x.Down3];
-        if (x.Squeeze > 999 || currents.Any(v => !double.IsFinite(v) || v is < 0 or > 65535) || hold.Any(v => v > 999) || up.Concat(down).Any(v => v > 500) || x.Cool1 > 999 || x.Cool2 > 999)
-            throw new InvalidOperationException("범위: ADC 목표 0~65535, SQ/COOL·Weld Time 0~999 ms, UP/DOWN 0~500 ms");
+        if (x.Squeeze > 10000 || currents.Any(v => !double.IsFinite(v) || v is < 0 or > 10000) ||
+            hold.Any(v => v > 10000) || up.Concat(down).Any(v => v > 10000) ||
+            x.Cool1 > 10000 || x.Cool2 > 10000)
+            throw new InvalidOperationException("범위: ADC 목표·SQ/COOL·UP·Weld Time·DOWN 0~10000");
         if (currents.Where((v, i) => (v == 0) != (hold[i] == 0) || (v == 0 && (up[i] != 0 || down[i] != 0))).Any())
             throw new InvalidOperationException("미사용 단은 ADC 목표·UP·Weld Time·DOWN을 모두 0으로 설정하세요.");
         return x;
@@ -751,6 +818,7 @@ public partial class MainWindow : Window
 
     void RogowskiChannel_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowRogowskiChannel();
     void RogowskiDisplayMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowRogowskiChannel();
+    void PwmFrequency_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowRogowskiChannel();
 
     void RogowskiOffsetMode_Changed(object sender, RoutedEventArgs e)
     {
@@ -826,9 +894,10 @@ public partial class MainWindow : Window
             }
             else
             {
-                displayed = RogowskiRmsEnvelope(capture.TimesMs, integrated);
+                int pwmFrequency = PwmFrequencyBox.SelectedIndex == 0 ? 1000 : 2000;
+                displayed = RogowskiRmsEnvelope(capture.TimesMs, integrated, pwmFrequency);
                 unit = "V·ms RMS (상대 전류)";
-                mode = "적분 원파형의 PWM 1주기 RMS 포락선";
+                mode = $"적분 원파형의 {pwmFrequency / 1000} kHz PWM 1주기 RMS 포락선";
             }
         }
         RogowskiWaveform.SetData(capture.TimesMs, displayed, unit, displayMode == 0);
@@ -880,9 +949,11 @@ public partial class MainWindow : Window
         return sum / fallbackCount;
     }
 
-    static double[] RogowskiRmsEnvelope(IReadOnlyList<double> timesMs, IReadOnlyList<double> integrated)
+    static double[] RogowskiRmsEnvelope(IReadOnlyList<double> timesMs,
+                                        IReadOnlyList<double> integrated,
+                                        double pwmFrequencyHz)
     {
-        const double pwmPeriodMs = 1000.0 / 4196.1669921875;
+        double pwmPeriodMs = 1000.0 / pwmFrequencyHz;
         double dtMs = timesMs[1] - timesMs[0];
         int window = Math.Max(3, (int)Math.Round(pwmPeriodMs / dtMs));
         int half = window / 2;
@@ -1124,6 +1195,7 @@ public partial class MainWindow : Window
                     throw new InvalidOperationException("시험할 단계를 한 개 이상 설정하세요.");
                 testSettings = settings;
                 testDuty = limit;
+                testFrequency = PwmFrequencyBox.SelectedIndex == 0 ? 1000 : 2000;
                 testTrace.Clear();
                 adcWindow?.SetTrace(testTrace);
                 SaveTestTraceButton.IsEnabled = false;
@@ -1147,11 +1219,52 @@ public partial class MainWindow : Window
                     await SendSettings(settings);
                     if (cancelTestStart)
                         return;
-                    string reply = await Command($"TEST START duty_percent={limit}");
+                    string reply = await Command($"TEST START duty_percent={limit} frequency_hz={testFrequency}");
                     if (reply != "OK TEST")
-                        throw new IOException("장비 응답: " + reply);
+                    {
+                        string detail = reply;
+                        if (reply == "ERR TEST_NOT_READY")
+                        {
+                            using var rejected = JsonDocument.Parse(await Command("TEST STATUS"));
+                            uint code = rejected.RootElement.TryGetProperty("start_reject", out JsonElement rejectElement)
+                                ? rejectElement.GetUInt32() : 0U;
+                            if (code == 4U &&
+                                rejected.RootElement.TryGetProperty("current_fault", out JsonElement currentFaultElement))
+                            {
+                                uint currentFault = currentFaultElement.GetUInt32();
+                                uint pwmFault = rejected.RootElement.TryGetProperty("pwm_fault", out JsonElement pwmFaultElement)
+                                    ? pwmFaultElement.GetUInt32() : 0U;
+                                uint timing = rejected.RootElement.TryGetProperty("current_fault_detail", out JsonElement timingElement)
+                                    ? timingElement.GetUInt32() : 0U;
+                                string timingText = timing switch
+                                {
+                                    1 => "DMA half 순서",
+                                    2 => "DMA 진입 소유권",
+                                    3 => "DMA 종료 소유권",
+                                    4 => "ADC 처리시간 초과",
+                                    5 => "ADC 게시시간 초과",
+                                    6 => "PWM compare preload 시점",
+                                    _ => "HAL ADC/DMA 오류 또는 상세 없음"
+                                };
+                                detail += $" · current_fault={currentFault}, pwm_fault={pwmFault}, detail={timing} ({timingText}); 리셋 필요";
+                            }
+                            else detail += code switch
+                            {
+                                1 => " · 시험 설정 범위 오류",
+                                2 => " · 지원하지 않는 PWM 주파수",
+                                3 => " · 이미 시험 실행 중",
+                                4 => " · ADC 또는 PWM fault가 래치됨(구형 상세 상태; 리셋 필요)",
+                                5 => " · ADC DMA 데이터가 아직 없음",
+                                6 => " · ADC DMA 갱신 정지",
+                                7 => " · 주파수 변경 중 ADC DMA 정지 실패",
+                                8 => " · 주파수 변경 후 ADC DMA 재시작 실패",
+                                _ => " · 구형 펌웨어이거나 상세 원인 미지원"
+                            };
+                        }
+                        throw new IOException("장비 응답: " + detail);
+                    }
                 }
-                StatusText.Text = $"PWM 단발 시험 시작 · 각 상 최대 {limit}% · {(PwmTestCheckBox.IsChecked == true ? "PID OFF" : "PID ON · ADC 정규화")}";
+                StatusText.Text = $"PWM 단발 시험 시작 · {testFrequency / 1000} kHz · 각 상 최대 {limit}% · {(PwmTestCheckBox.IsChecked == true ? "PID OFF" : "PID ON · ADC 정규화")}";
             }
             else
             {
@@ -1181,7 +1294,7 @@ public partial class MainWindow : Window
         bool connected = timer.IsEnabled;
         SetProfileOperationEnabled(connected && !active);
         SettingsGrid.IsEnabled = ProfileFileBox.IsEnabled = ProfileNumberBox.IsEnabled = !active;
-        PwmTestCheckBox.IsEnabled = TestDutyBox.IsEnabled = PidEnableCheckBox.IsEnabled = ApplyPidButton.IsEnabled = PidKpBox.IsEnabled = PidKiBox.IsEnabled = PidKdBox.IsEnabled = !active;
+        PwmTestCheckBox.IsEnabled = TestDutyBox.IsEnabled = PwmFrequencyBox.IsEnabled = PidEnableCheckBox.IsEnabled = ApplyPidButton.IsEnabled = PidKpBox.IsEnabled = PidKiBox.IsEnabled = PidKdBox.IsEnabled = !active;
         StopCycleButton.IsEnabled = connected;
         CaptureScreenButton.IsEnabled = connected && !active && !simulation;
     }
@@ -1255,7 +1368,9 @@ public partial class MainWindow : Window
             4 => "ADC/타이밍 오류",
             _ => "대기"
         };
-        TestStateText.Text = $"{(running ? "시험 중" : result)} · {r.GetProperty("time_ms").GetUInt32()} ms · 듀티 {r.GetProperty("duty_permille").GetUInt32() / 10.0:0.0}% · ADC {r.GetProperty("adc_mean").GetUInt32()}";
+        uint frequency = r.TryGetProperty("pwm_frequency_hz", out JsonElement frequencyElement)
+            ? frequencyElement.GetUInt32() : (uint)testFrequency;
+        TestStateText.Text = $"{(running ? "시험 중" : result)} · {frequency / 1000.0:0.###} kHz · {r.GetProperty("time_ms").GetUInt32()} ms · 듀티 {r.GetProperty("duty_permille").GetUInt32() / 10.0:0.0}% · ADC {r.GetProperty("adc_mean").GetUInt32()}";
         if (running)
             SetTestBusy(true);
         if (!running && testBusy)
@@ -1362,6 +1477,7 @@ public partial class MainWindow : Window
     void Window_Closing(object? s, System.ComponentModel.CancelEventArgs e)
     {
         SaveWindowLayout();
+        SaveAppSettings();
         Disconnect();
     }
 }
