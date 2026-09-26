@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     Settings testSettings;
     double testDuty;
     readonly List<string> testTrace = [];
+    RogowskiCapture? rogowskiCapture;
 
     sealed record WindowLayout(double Left, double Top, double Width, double Height);
     static string WindowLayoutPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WeldApp", "window.json");
@@ -647,6 +648,255 @@ public partial class MainWindow : Window
         adcWindow.SetTrace(testTrace);
         adcWindow.Show();
         adcWindow.Activate();
+    }
+
+    async void LoadRogowskiCsv_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Rigol 원본 / ADC CSV (*.csv)|*.csv|모든 파일 (*.*)|*.*",
+            Title = "로고스키 Rigol 원본 또는 ADC 데이터 선택"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            RogowskiFileText.Text = "CSV를 읽는 중입니다...";
+            Mouse.OverrideCursor = Cursors.Wait;
+            RogowskiCapture capture = await Task.Run(() => ReadRogowskiCapture(dialog.FileName));
+            rogowskiCapture = capture;
+            RogowskiChannelBox.ItemsSource = capture.ChannelNames;
+            RogowskiChannelBox.SelectedIndex = 0;
+            RogowskiAutoOffsetCheckBox.IsChecked = true;
+            RogowskiOffsetTextBox.Text = DetectRogowskiOffset(capture.TimesMs, capture.Channels[0])
+                .ToString("0.#########", CultureInfo.InvariantCulture);
+            WaveTabs.SelectedIndex = 2;
+            ShowRogowskiChannel();
+        }
+        catch (Exception ex)
+        {
+            RogowskiWaveform.Clear();
+            RogowskiFileText.Text = "불러오기 실패";
+            Error("로고스키 CSV 오류", ex.Message);
+        }
+        finally { Mouse.OverrideCursor = null; }
+    }
+
+    static RogowskiCapture ReadRogowskiCapture(string path)
+    {
+        using var reader = new StreamReader(path, Encoding.UTF8, true);
+        string headerLine = reader.ReadLine() ?? throw new IOException("빈 CSV 파일입니다.");
+        string[] header = headerLine.Split(',').Select(x => x.Trim()).ToArray();
+        bool adcFormat = header.Length >= 4 && header[0] == "sample_index" && header[1] == "time_s" && header[2] == "time_ms";
+        bool rigolFormat = header.Length >= 2 && header[0] == "Time(s)";
+        if (!adcFormat && !rigolFormat)
+            throw new IOException("지원 형식이 아닙니다. Rigol Time(s),CHx(V) 원본 또는 ADC 재샘플 CSV가 필요합니다.");
+
+        int channelOffset = adcFormat ? 3 : 1;
+        int timeOffset = adcFormat ? 2 : 0;
+        string[] channelNames = header[channelOffset..];
+        var displayedTimes = new List<double>();
+        var channels = channelNames.Select(_ => new List<double>()).ToArray();
+        string? line;
+        int lineNumber = 1;
+        double previousTime = double.NegativeInfinity;
+        while ((line = reader.ReadLine()) is not null)
+        {
+            lineNumber++;
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            string[] fields = line.Split(',');
+            if (fields.Length != header.Length ||
+                !double.TryParse(fields[timeOffset], NumberStyles.Float, CultureInfo.InvariantCulture, out double displayedTime) ||
+                !double.IsFinite(displayedTime) || (adcFormat && displayedTime <= previousTime))
+                throw new IOException($"{lineNumber}행의 시간 또는 필드 형식이 잘못되었습니다.");
+            previousTime = displayedTime;
+            displayedTimes.Add(displayedTime);
+            for (int i = 0; i < channels.Length; i++)
+            {
+                if (!double.TryParse(fields[i + channelOffset], NumberStyles.Float, CultureInfo.InvariantCulture, out double value) || !double.IsFinite(value))
+                    throw new IOException($"{lineNumber}행 {channelNames[i]} 값이 숫자가 아닙니다.");
+                channels[i].Add(value);
+            }
+            if (displayedTimes.Count > 5_000_000)
+                throw new IOException("최대 5,000,000개 샘플까지만 불러올 수 있습니다.");
+        }
+        if (displayedTimes.Count < 2)
+            throw new IOException("표시할 샘플이 두 개 이상 필요합니다.");
+
+        double[] timesMs;
+        string source;
+        if (adcFormat)
+        {
+            timesMs = displayedTimes.ToArray();
+            source = "ADC 재샘플";
+        }
+        else
+        {
+            double startSeconds = displayedTimes[0];
+            double endSeconds = displayedTimes[^1];
+            if (endSeconds <= startSeconds)
+                throw new IOException("Rigol 원본의 시작/종료 시간이 잘못되었습니다.");
+            // Rigol prints fewer time digits than its 2/5-MHz sample interval.
+            // Reconstruct its uniform grid from the complete record duration.
+            double intervalSeconds = (endSeconds - startSeconds) / displayedTimes.Count;
+            timesMs = new double[displayedTimes.Count];
+            for (int i = 0; i < timesMs.Length; i++)
+                timesMs[i] = (startSeconds + i * intervalSeconds) * 1000.0;
+            source = $"Rigol 원본 {1.0 / intervalSeconds / 1_000_000.0:0.###} MS/s";
+        }
+        return new(Path.GetFileName(path), timesMs, channelNames,
+            channels.Select(x => x.ToArray()).ToArray(), source);
+    }
+
+    void RogowskiChannel_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowRogowskiChannel();
+    void RogowskiDisplayMode_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowRogowskiChannel();
+
+    void RogowskiOffsetMode_Changed(object sender, RoutedEventArgs e)
+    {
+        if (RogowskiOffsetTextBox is null)
+            return;
+        bool automatic = RogowskiAutoOffsetCheckBox.IsChecked == true;
+        RogowskiOffsetTextBox.IsEnabled = !automatic;
+        if (automatic && rogowskiCapture is { } capture &&
+            RogowskiChannelBox.SelectedIndex is int selected && selected >= 0 && selected < capture.Channels.Length)
+        {
+            RogowskiOffsetTextBox.Text = DetectRogowskiOffset(capture.TimesMs, capture.Channels[selected])
+                .ToString("0.#########", CultureInfo.InvariantCulture);
+            ShowRogowskiChannel();
+        }
+    }
+
+    void RogowskiApplyOffset_Click(object sender, RoutedEventArgs e)
+    {
+        if (RogowskiAutoOffsetCheckBox.IsChecked == true)
+        {
+            ShowRogowskiChannel();
+            return;
+        }
+        if (!TryReadManualRogowskiOffset(out _))
+        {
+            Error("오프셋 입력 오류", "유한한 전압값을 입력하십시오. 예: -0.155");
+            RogowskiOffsetTextBox.Focus();
+            RogowskiOffsetTextBox.SelectAll();
+            return;
+        }
+        ShowRogowskiChannel();
+    }
+
+    void RogowskiZoomIn_Click(object sender, RoutedEventArgs e) => RogowskiWaveform.ZoomIn();
+    void RogowskiZoomOut_Click(object sender, RoutedEventArgs e) => RogowskiWaveform.ZoomOut();
+    void RogowskiResetZoom_Click(object sender, RoutedEventArgs e) => RogowskiWaveform.ResetZoom();
+
+    void ShowRogowskiChannel()
+    {
+        if (rogowskiCapture is not { } capture)
+            return;
+        int selected = RogowskiChannelBox.SelectedIndex;
+        if (selected < 0 || selected >= capture.Channels.Length)
+            return;
+        int displayMode = RogowskiDisplayModeBox.SelectedIndex;
+        double[] displayed;
+        string unit;
+        string mode;
+        if (displayMode == 2)
+        {
+            displayed = capture.Channels[selected];
+            unit = "V";
+            mode = "원본 전압";
+        }
+        else
+        {
+            double automaticOffset = DetectRogowskiOffset(capture.TimesMs, capture.Channels[selected]);
+            double offset = automaticOffset;
+            bool manualOffset = RogowskiAutoOffsetCheckBox.IsChecked != true;
+            if (manualOffset && !TryReadManualRogowskiOffset(out offset))
+            {
+                RogowskiFileText.Text = "수동 오프셋이 올바르지 않습니다. 유한한 전압값을 입력한 뒤 '오프셋 적용'을 누르십시오.";
+                return;
+            }
+            if (!manualOffset)
+                RogowskiOffsetTextBox.Text = automaticOffset.ToString("0.#########", CultureInfo.InvariantCulture);
+            double[] integrated = IntegrateRogowski(capture.TimesMs, capture.Channels[selected], offset);
+            if (displayMode == 1)
+            {
+                displayed = integrated;
+                unit = "V·ms (적분 원파형)";
+                mode = $"{(manualOffset ? "수동" : "PWM 전 자동")} 고정 오프셋 {offset:0.#########} V + 단순 누적";
+            }
+            else
+            {
+                displayed = RogowskiRmsEnvelope(capture.TimesMs, integrated);
+                unit = "V·ms RMS (상대 전류)";
+                mode = "적분 원파형의 PWM 1주기 RMS 포락선";
+            }
+        }
+        RogowskiWaveform.SetData(capture.TimesMs, displayed, unit, displayMode == 0);
+        if (displayMode == 1)
+            RogowskiWaveform.SetTimeWindow(-0.5, 2.0);
+        double intervalUs = (capture.TimesMs[1] - capture.TimesMs[0]) * 1000.0;
+        RogowskiFileText.Text = $"{capture.FileName} · {capture.Source} · {capture.ChannelNames[selected]} · {capture.TimesMs.Length:N0} samples · {intervalUs:0.######} µs/sample · {mode}";
+    }
+
+    bool TryReadManualRogowskiOffset(out double offset)
+    {
+        string text = RogowskiOffsetTextBox.Text.Trim();
+        bool parsed = double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out offset) ||
+                      double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out offset);
+        return parsed && double.IsFinite(offset);
+    }
+
+    static double[] IntegrateRogowski(IReadOnlyList<double> timesMs, IReadOnlyList<double> volts)
+        => IntegrateRogowski(timesMs, volts, DetectRogowskiOffset(timesMs, volts));
+
+    static double[] IntegrateRogowski(IReadOnlyList<double> timesMs, IReadOnlyList<double> volts, double offset)
+    {
+        int count = volts.Count;
+        var integrated = new double[count];
+        for (int i = 1; i < count; i++)
+        {
+            double dtMs = timesMs[i] - timesMs[i - 1];
+            integrated[i] = integrated[i - 1] +
+                ((volts[i - 1] - offset) + (volts[i] - offset)) * 0.5 * dtMs;
+        }
+        return integrated;
+    }
+
+    static double DetectRogowskiOffset(IReadOnlyList<double> timesMs, IReadOnlyList<double> volts)
+    {
+        const double pwmStartGuardMs = 0.5;
+        double sum = 0;
+        int sampleCount = 0;
+        for (int i = 0; i < volts.Count && timesMs[i] < -pwmStartGuardMs; i++)
+        {
+            sum += volts[i];
+            sampleCount++;
+        }
+        if (sampleCount >= 2)
+            return sum / sampleCount;
+        int fallbackCount = Math.Max(2, volts.Count / 20);
+        sum = 0;
+        for (int i = 0; i < fallbackCount; i++) sum += volts[i];
+        return sum / fallbackCount;
+    }
+
+    static double[] RogowskiRmsEnvelope(IReadOnlyList<double> timesMs, IReadOnlyList<double> integrated)
+    {
+        const double pwmPeriodMs = 1000.0 / 4196.1669921875;
+        double dtMs = timesMs[1] - timesMs[0];
+        int window = Math.Max(3, (int)Math.Round(pwmPeriodMs / dtMs));
+        int half = window / 2;
+        var prefixSquares = new double[integrated.Count + 1];
+        for (int i = 0; i < integrated.Count; i++)
+            prefixSquares[i + 1] = prefixSquares[i] + integrated[i] * integrated[i];
+        var envelope = new double[integrated.Count];
+        for (int i = 0; i < envelope.Length; i++)
+        {
+            int start = Math.Max(0, i - half);
+            int end = Math.Min(envelope.Length, i + half + 1);
+            envelope[i] = Math.Sqrt(Math.Max(0, (prefixSquares[end] - prefixSquares[start]) / (end - start)));
+        }
+        return envelope;
     }
 
     void UpdateSecondary(JsonElement response)

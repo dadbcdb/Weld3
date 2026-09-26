@@ -1,0 +1,18 @@
+{
+  "source_file": "RigolDS3.csv",
+  "source_rows": 1000000,
+  "source_start_s": -0.05152,
+  "source_displayed_end_s": 0.14848,
+  "source_reconstructed_last_sample_s": 0.1484798,
+  "reconstructed_source_sample_rate_hz": 5000000.0,
+  "adc_sample_rate_hz": 268554.6875,
+  "adc_sample_interval_s": 3.7236363636363637e-06,
+  "output_rows": 53711,
+  "method": "zero-phase Blackman-windowed sinc anti-alias FIR, then linear interpolation on reconstructed uniform Rigol time grid",
+  "anti_alias_fir_taps": 1491,
+  "anti_alias_cutoff_hz": 107421.875,
+  "units": {
+    "CH1(V)": "V"
+  },
+  "conversion_status": "Voltage only; ADC-code and ampere calibration not applied"
+}

@@ -599,6 +599,96 @@
                             x:Name="TestWaveform" />
                     </GroupBox>
                 </TabItem>
+                <TabItem
+                    Header="로고스키 실측 파형">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <Button
+                                Content="Rigol 원본 / ADC CSV"
+                                Click="LoadRogowskiCsv_Click"
+                                Padding="14,6" />
+                            <TextBlock
+                                Text="채널"
+                                Margin="16,0,7,0"
+                                VerticalAlignment="Center"
+                                Foreground="#93A8C3" />
+                            <ComboBox
+                                x:Name="RogowskiChannelBox"
+                                Width="120"
+                                SelectionChanged="RogowskiChannel_SelectionChanged" />
+                            <TextBlock
+                                Text="표시"
+                                Margin="12,0,7,0"
+                                VerticalAlignment="Center"
+                                Foreground="#93A8C3" />
+                            <ComboBox
+                                x:Name="RogowskiDisplayModeBox"
+                                Width="155"
+                                SelectedIndex="1"
+                                SelectionChanged="RogowskiDisplayMode_SelectionChanged">
+                                <ComboBoxItem Content="RMS 전류 포락선" />
+                                <ComboBoxItem Content="적분 원파형" />
+                                <ComboBoxItem Content="원본 전압" />
+                            </ComboBox>
+                            <CheckBox
+                                x:Name="RogowskiAutoOffsetCheckBox"
+                                Content="자동 오프셋"
+                                IsChecked="True"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                Checked="RogowskiOffsetMode_Changed"
+                                Unchecked="RogowskiOffsetMode_Changed" />
+                            <TextBox
+                                x:Name="RogowskiOffsetTextBox"
+                                Width="82"
+                                Margin="7,0,0,0"
+                                VerticalContentAlignment="Center"
+                                IsEnabled="False"
+                                ToolTip="적분에서 뺄 전압 오프셋 (V)" />
+                            <TextBlock
+                                Text="V"
+                                Margin="4,0,0,0"
+                                VerticalAlignment="Center"
+                                Foreground="#93A8C3" />
+                            <Button
+                                Content="오프셋 적용"
+                                Click="RogowskiApplyOffset_Click"
+                                Margin="7,0,0,0"
+                                Padding="9,4" />
+                            <Button
+                                Content="확대 +"
+                                Click="RogowskiZoomIn_Click"
+                                Margin="12,0,0,0"
+                                Padding="10,4" />
+                            <Button
+                                Content="축소 −"
+                                Click="RogowskiZoomOut_Click"
+                                Margin="5,0,0,0"
+                                Padding="10,4" />
+                            <Button
+                                Content="전체 보기"
+                                Click="RogowskiResetZoom_Click"
+                                Margin="5,0,0,0"
+                                Padding="10,4" />
+                        </StackPanel>
+                        <local:RogowskiTraceChart
+                            x:Name="RogowskiWaveform"
+                            Grid.Row="1"
+                            Margin="0,8,0,0" />
+                        <TextBlock
+                            x:Name="RogowskiFileText"
+                            Grid.Row="2"
+                            Margin="0,7,0,0"
+                            Text="기본 표시는 트리거 전 오프셋을 뺀 뒤 단순 누적한 적분 원파형입니다. RMS 포락선은 선택 표시입니다."
+                            Foreground="#93A8C3"
+                            TextWrapping="Wrap" />
+                    </Grid>
+                </TabItem>
             </TabControl>
         </Grid>
         <Border

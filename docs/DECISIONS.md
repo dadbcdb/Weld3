@@ -1,5 +1,59 @@
 # Design Decisions
 
+## 2026-09-25 — Manual Rogowski offset is an explicit fixed override
+
+WinApp keeps guarded pre-PWM mean detection as the default, but permits the
+operator to disable automatic offset and enter a voltage offset explicitly.
+The selected value is frozen for the complete record and used unchanged by
+both the plain trapezoidal integral and its optional RMS view. Manual entry
+does not introduce active-window adaptation or endpoint correction, and the
+status text identifies whether the fixed offset is automatic or manual.
+
+## 2026-09-25 — WinApp can integrate the native Rigol record directly
+
+Accept both native `Time(s),CHx(V)` Rigol files and the ADC-grid format. For a
+native file, do not trust individually repeated rounded timestamps; reconstruct
+the uniform source grid from the first/last displayed times and the complete
+row count. Perform baseline detection and integration at the native 2/5-MHz
+rate. This view answers waveform-analysis needs without conflating the result
+with what a 268.55-kS/s STM32 ADC would acquire. The ADC-grid path remains for
+ADC simulation and therefore retains its anti-alias filtering requirement.
+
+## 2026-09-25 — Anti-alias filter before Rigol-to-ADC resampling
+
+Do not point-sample/interpolate the 2/5-MHz direct Rogowski captures directly
+onto the 268,554.6875-S/s ADC grid. That aliases narrow coil spikes and scope
+noise into the current band and corrupts subsequent integration. Apply a
+zero-phase Blackman-windowed sinc FIR first, with cutoff 0.4 times the output
+sample rate (107,421.875 Hz), then interpolate at the exact ADC times. Tap count
+scales with the input/output ratio (1491 taps for 5 MHz). This is a software
+anti-alias reference; the target still requires an electrically verified
+analogue anti-alias filter ahead of the STM32 ADC.
+
+## 2026-09-25 — Rogowski import defaults to uncalibrated integration
+
+The imported Rigol channel is a Rogowski voltage and therefore resembles
+current derivative spikes, not current. The authoritative `적분 원파형` path
+uses arithmetic-mean offsets and a plain trapezoidal cumulative sum. The
+authoritative measurement path uses only the mean before the known PWM start,
+excluding a 0.5-ms edge guard, and freezes it for the full capture. Never infer
+or adapt an offset from PWM-active or post-PWM data: doing so cannot distinguish
+measurement error from real low-frequency current and is not valid metrology.
+Do not apply long-window drift shaping to this raw integral. RMS remains an optional derived view; raw voltage remains
+available. Results are labeled in V·ms, not amperes. Absolute A conversion remains blocked on a verified
+Rogowski mutual inductance/sensitivity and signal-chain gain. The chart renderer also
+emits pixel-bucket extrema in time order as one continuous path; the previous
+disconnected vertical min/max bars were not an acceptable waveform view.
+
+## 2026-09-25 — Imported Rogowski captures remain voltage-domain data
+
+WinApp loads the ADC-grid CSV files into a dedicated Rogowski waveform tab and
+labels raw mode in volts. It does not present these captures as amperes until the
+analogue offset/gain and A/V calibration are verified. Rendering uses one
+minimum/maximum envelope per horizontal pixel so a 50k–134k sample capture can
+be displayed efficiently without dropping narrow peaks. Signed automatic
+scaling and a zero reference line preserve the captured negative excursions.
+
 ## 2026-09-24 — Stage values are direct ADC targets
 
 User requested replacing stage current entries with ADC codes. Accept 0..65535

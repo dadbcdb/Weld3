@@ -1,5 +1,141 @@
 # Project Status
 
+## 2026-09-25 — User-settable WinApp integration offset
+
+Added an automatic/manual offset control to the Rogowski waveform tab. Auto
+remains the default and displays the detected guarded pre-PWM mean. Clearing
+the checkbox enables a voltage entry; `오프셋 적용` validates a finite number
+and recomputes both the integrated trace and RMS view using that one fixed
+value. Release build completed with zero warnings/errors and the
+`PWM_SingleShot` package was refreshed.
+
+## 2026-09-25 — Synthetic 100-ms square-current CSV
+
+Added `pid_test/synthetic/SquareCurrent_100ms.csv` as an ideal relative-current
+reference and `SquareCurrent_100ms_Rogowski.csv` as its direct-coil derivative
+with -0.155 V offset, 200-us rise/fall and 268,554.6875-S/s ADC-grid timing.
+The actual WinApp parser/integrator reproduced 1.000000002 relative amplitude
+at 50 ms and returned to 1.4e-9 after 100.3 ms. The generator script makes both
+fixtures reproducible. Added `BipolarSquareVoltage_100ms.csv` to demonstrate
+the textbook square-voltage integral: +1 V for 50 ms followed by -1 V for
+50 ms. Fixed pre-trigger offset integration gives 49.9954 V*ms at the apex and
+-0.0037 V*ms after the full 100-ms cycle (ADC-grid boundary quantization).
+
+## 2026-09-25 — Measurement-valid fixed offset restored
+
+Supersedes the PWM-state offset entry below. Adaptive/ON/post offsets were
+removed because they can erase real low-frequency current and therefore are
+not valid measurement. WinApp again freezes one arithmetic-mean offset from
+the guarded pre-PWM zero-current interval and applies only the trapezoidal
+cumulative sum. Any PWM-active slope remains visible for electrical diagnosis.
+Release build and package publish passed.
+
+## 2026-09-25 — PWM-state Rogowski offsets
+
+A single pre-PWM offset still produced the reported active-window slope because
+the measured coil channel mean changes when PWM is present (for example DS1 is
+about -0.155 V OFF versus -0.145 V ON). WinApp now keeps the same cumulative
+integration formula but uses separately measured OFF-before, PWM-ON and
+OFF-after means. The ON mean is the trapezoidal mean over the detected complete
+finite burst, which makes its net coil area zero without reshaping samples.
+The UI reports all three offsets. Release build and package publish passed.
+
+## 2026-09-25 — PWM-pretrigger mean offset
+
+Corrected Rogowski offset detection from a pre-trigger median to the arithmetic
+mean before the known t=0 PWM start, excluding the final 0.5 ms as an edge
+guard. DS1/DS2/DS3 offsets are approximately -0.155/-0.157/-0.152 V and the
+integral is flat through the guarded pre-PWM interval. The value is frozen for
+the whole record; no post-PWM or endpoint forcing is applied. Release build and
+package publish passed.
+
+## 2026-09-25 — Plain offset-subtracted Rogowski integration
+
+At user direction, removed endpoint, slow-centre and per-cycle corrections from
+the authoritative integrated waveform. WinApp now detects one pre-trigger
+offset and computes only the trapezoidal cumulative sum of `(V-offset)`
+over the original sample intervals. DS1..DS3 each detected -0.1632962 V. Any
+remaining slope or end error is shown as measured rather than silently forced
+away. `적분 원파형` is now the default selector. Release build and package
+publish passed.
+
+## 2026-09-25 — Direct-coil RMS current envelope
+
+Supersedes both the earlier endpoint correction and 2-ms slow-centre removal.
+Native DS1..DS3 analysis found a dominant 16.783-kHz repetition, four groups
+per 4.196-kHz bridge period. Integration now removes the trapezoidal mean and
+integrates independently in exact 59.58-us intervals, preventing long-record
+drift without creating a V-shaped centre. The RMS view uses bucket averages
+instead of peak-envelope filling. Selecting `적분 원파형` automatically opens
+a 2-ms window around the trigger so individual switching cycles are visible.
+Release build and package publish passed.
+
+## 2026-09-25 — Native Rigol integration in WinApp
+
+The Rogowski tab now directly loads `RigolDS0~3.csv` native Rigol format as
+well as ADC-grid CSV. It reconstructs repeated rounded scope timestamps as a
+uniform 2/5-MHz grid and performs the relative-current integration at the full
+native rate. The actual WinApp parser/integrator processed all four one-million
+row originals; DS0 exposed both channels, DS1..DS3 produced finite traces and
+returned within 0.02 V·ms of zero. Release build and packaged publish passed.
+
+## 2026-09-25 — Rigol ADC resampling anti-alias correction
+
+The original resampler used linear interpolation without a prefilter, causing
+aliasing of the direct Rogowski coil spikes. It now applies a zero-phase
+Blackman-windowed sinc FIR at 107,421.875 Hz before conversion to
+268,554.6875 S/s. All four ADC-grid CSV/JSON pairs were regenerated. Against
+the old point-sampled result, DS1..DS3 changed by 0.28..0.39 V RMS with peak
+corrections of 3.71..6.62 V, confirming that aliasing was material. The WinApp
+integrator accepted all regenerated files and returned end levels within
+0.02 V·ms of zero. Reload the CSV in an already-running app to use new data.
+
+## 2026-09-25 — Rogowski waveform rendering and integration correction
+
+Fixed the zoomed chart's disconnected vertical bars by drawing a continuous
+time-ordered path while retaining per-pixel extrema. Added a display selector:
+the default `적분 상대전류` detects the active interval from 1-ms RMS blocks,
+interpolates pre/post quiet baselines, trapezoidally integrates voltage, and
+removes residual linear drift across that active interval so the finite pulse
+returns to zero. `원본 전압` shows the captured samples.
+The integrated axis is V·ms because amperes calibration is unavailable. All
+three single-channel captures passed the actual WinApp parser/integrator with
+53,711 finite output samples each and end levels within 0.02 V·ms of zero.
+Release build and packaged publish passed.
+
+## 2026-09-25 — Rogowski waveform zoom and pan
+
+The imported Rogowski chart now supports cursor-centred mouse-wheel time zoom,
+left-button horizontal drag/pan, double-click reset, and explicit zoom in/out/
+full-view buttons. The minimum view is 32 ADC samples. Y-axis scaling follows
+the visible time window and the displayed zoom multiplier reports the current
+time magnification. Release build/publish passed with zero warnings/errors and
+the updated controls were visually verified in the packaged WinApp.
+
+## 2026-09-25 — WinApp imported Rogowski waveform
+
+WinApp now has a `로고스키 실측 파형` tab. It loads the resampled CSV format,
+validates monotonic time and finite channel values, offers CH1/CH2 selection,
+and displays signed voltage with an automatic axis and zero reference. Large
+captures are rendered as per-pixel min/max envelopes to retain narrow peaks.
+All four generated Rigol files passed the actual WinApp parser (134,278 rows
+for DS0 and 53,711 rows each for DS1..DS3). .NET Release build/publish passed
+with zero warnings and errors; `PWM_SingleShot` contains the updated app.
+No ADC-code or ampere calibration is claimed and no firmware/power output was
+changed.
+
+## 2026-09-25 — Rigol Rogowski captures resampled for ADC playback
+
+`pid_test/RigolDS0.csv` through `RigolDS3.csv` were resampled onto the firmware
+ADC grid of 268,554.6875 samples/s (3.723636 us/sample) and saved under
+`pid_test/adc_resampled`. Repeated rounded Rigol timestamps are not used as
+individual sample times; the uniform 2 MHz or 5 MHz source grid is reconstructed
+from each complete 1,000,000-point acquisition, then linearly interpolated.
+Each output has a JSON sidecar recording the rates, row counts and method.
+Channel data remains in volts. ADC-code and ampere conversion is intentionally
+deferred until the Rogowski analogue offset/gain and current calibration are
+verified. `pid_test/resample_rigol_for_adc.py` makes the conversion reproducible.
+
 ## Stage ADC target entry
 
 WinApp stage column now accepts ADC targets 0..65535; PID directly tracks those
